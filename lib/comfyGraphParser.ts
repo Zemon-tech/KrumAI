@@ -8,7 +8,7 @@ export interface GenSettings {
   guidance: number;
   width: number;
   height: number;
-  duration?: number; // video frame count (default 121 = ~5s at 25fps)
+  duration?: number; // video duration in seconds (default 5)
   fps?: number;      // video frames per second (default 25)
 }
 
@@ -133,7 +133,7 @@ export function parseGraph(
       graph["267_258"].inputs.value = height;
     }
 
-    // 4. Duration (frame count) — 121 frames ≈ 5 seconds at 25 fps
+    // 4. Duration (seconds) — e.g. 5, 8, or 10 seconds
     if (duration !== undefined && graph["267_225"] && graph["267_225"].inputs) {
       graph["267_225"].inputs.value = duration;
     }

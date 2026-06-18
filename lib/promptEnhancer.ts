@@ -23,10 +23,19 @@ export interface EnhancementResult {
   duration?: number;
   fps?: number;
 }
+import { t2iEnhancer, t2vEnhancer, i2vEnhancer, i2iEnhancer } from "./prompts";
+
+const SYSTEM_PROMPTS: Record<string, string> = {
+  t2i: t2iEnhancer,
+  t2v: t2vEnhancer,
+  i2v: i2vEnhancer,
+  i2i: i2iEnhancer,
+};
 
 export async function enhancePrompt(
   prompt: string,
-  settings: GenSettings
+  settings: GenSettings,
+  selectedAssetPrompt?: string
 ): Promise<EnhancementResult> {
   const llmProvider = settings.llmProvider || "llamacpp";
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -50,25 +59,24 @@ export async function enhancePrompt(
     let clientProvider;
     let targetModel;
 
-    const systemPrompt = `You are a prompt engineering expert for generative models (Flux image generator, Qwen image editor, and LTX video generator).
-Your task is to take a raw user prompt, generation type, and settings, and enhance it:
-1. Write a highly detailed, visually descriptive, and rich version of the prompt (the "enhancedPrompt"). Enhance lighting, textures, camera placement, style, and mood to make it look premium.
-2. Maintain the core subject of the user's request.
-3. Optimize model settings (steps, guidance CFG scale, and aspect ratio width/height) if you feel the user's settings can be adjusted to better implement the style of the prompt. 
-   - Note: For video outputs (type: t2v or i2v), width is typically 768 and height is 512. For image outputs, it is typically 1024x1024 or standard aspect ratios.
-   - For steps and guidance, pick optimal values for the selected generation type (e.g. Flux likes steps: 20-30 and guidance: 3.5-6.0; LTX Video likes steps: 10-25).
-   - If the user's parameters are already optimal or you do not need to change them, return them as is.
+    const systemPrompt = SYSTEM_PROMPTS[settings.type] || SYSTEM_PROMPTS.t2i;
 
-Return a JSON object conforming to the schema.`;
-
-    const userInstructions = `User Raw Prompt: "${prompt}"
+    let userInstructions = `User Raw Prompt: "${prompt}"
 Generation Type: "${settings.type}"
 Current Settings:
 - Steps: ${settings.steps}
 - Guidance Scale: ${settings.guidance}
 - Width: ${settings.width}
 - Height: ${settings.height}
-- Model: ${settings.model}`;
+- Model: ${settings.model}${settings.duration !== undefined ? `\n- Duration (seconds): ${settings.duration}` : ""}${settings.fps !== undefined ? `\n- FPS: ${settings.fps}` : ""}`;
+
+    if (selectedAssetPrompt) {
+      userInstructions += `\n\n---
+Selected Asset Original Prompt (the asset previously generated and currently selected): "${selectedAssetPrompt}"
+Important context: The user is modifying or animating the selected asset. You MUST build your enhanced prompt in a series of what was already generated.
+- If editing (i2i), refer to this original prompt and describe only the modifications relative to it, requesting to keep all other elements unchanged.
+- If animating (i2v), use this original prompt as the initial framing/scene visual layout, and focus your motion description on camera movement and subject movement starting from that visual state.`;
+    }
 
     if (llmProvider === "llamacpp") {
       const baseURL = process.env.LLAMACPP_API_URL || "http://127.0.0.1:8080/v1";
@@ -102,6 +110,8 @@ Current Settings:
         guidance: z.number().optional().describe("Optimized CFG guidance scale."),
         width: z.number().optional().describe("Optimized canvas width (multiples of 8 or 16)."),
         height: z.number().optional().describe("Optimized canvas height (multiples of 8 or 16)."),
+        duration: z.number().optional().describe("Optimized video duration in seconds (up to 100 seconds). Only optimize and return this if generation type is t2v or i2v."),
+        fps: z.number().optional().describe("Optimized video frames per second (typically 24, 25, or 30). Only optimize and return this if generation type is t2v or i2v."),
       }),
       system: systemPrompt,
       prompt: userInstructions,
@@ -115,8 +125,8 @@ Current Settings:
       guidance: object.guidance ?? settings.guidance,
       width: object.width ?? settings.width,
       height: object.height ?? settings.height,
-      duration: settings.duration,
-      fps: settings.fps,
+      duration: object.duration ?? settings.duration,
+      fps: object.fps ?? settings.fps,
     };
   } catch (err) {
     console.error(`Failed to enhance prompt via ${llmProvider}:`, err);

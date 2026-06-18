@@ -2,46 +2,47 @@
   "9": {
     "class_type": "SaveImage",
     "inputs": {
+      "filename_prefix": "Flux2_dev",
       "images": [
         "98_8",
-        0
-      ],
-      "filename_prefix": "Flux2_dev"
-    }
-  },
-  "98_22": {
-    "class_type": "BasicGuider",
-    "inputs": {
-      "model": [
-        "98_102",
-        0
-      ],
-      "conditioning": [
-        "98_26",
         0
       ]
     }
   },
-  "98_26": {
-    "class_type": "FluxGuidance",
+  "98_6": {
+    "class_type": "CLIPTextEncode",
     "inputs": {
-      "conditioning": [
-        "98_6",
+      "text": "high fashion, vintage couture, street photography, luxury fashion shoot, neo brutalist architecture, pastel paints",
+      "clip": [
+        "98_38",
         0
-      ],
-      "guidance": 4
+      ]
     }
   },
-  "98_16": {
-    "class_type": "KSamplerSelect",
+  "98_8": {
+    "class_type": "VAEDecode",
     "inputs": {
-      "sampler_name": "euler"
+      "samples": [
+        "98_13",
+        0
+      ],
+      "vae": [
+        "98_10",
+        0
+      ]
     }
   },
   "98_10": {
     "class_type": "VAELoader",
     "inputs": {
       "vae_name": "full_encoder_small_decoder.safetensors"
+    }
+  },
+  "98_12": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "flux2_dev_fp8mixed.safetensors",
+      "weight_dtype": "default"
     }
   },
   "98_13": {
@@ -69,15 +70,38 @@
       ]
     }
   },
-  "98_8": {
-    "class_type": "VAEDecode",
+  "98_16": {
+    "class_type": "KSamplerSelect",
     "inputs": {
-      "samples": [
-        "98_13",
+      "sampler_name": "euler"
+    }
+  },
+  "98_22": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "98_102",
         0
       ],
-      "vae": [
-        "98_10",
+      "conditioning": [
+        "98_26",
+        0
+      ]
+    }
+  },
+  "98_25": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 978636419372261,
+      "control_after_generate": "randomize"
+    }
+  },
+  "98_26": {
+    "class_type": "FluxGuidance",
+    "inputs": {
+      "guidance": 4,
+      "conditioning": [
+        "98_6",
         0
       ]
     }
@@ -88,6 +112,14 @@
       "clip_name": "mistral_3_small_flux2_bf16.safetensors",
       "type": "flux2",
       "device": "default"
+    }
+  },
+  "98_47": {
+    "class_type": "EmptyFlux2LatentImage",
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
     }
   },
   "98_48": {
@@ -101,40 +133,29 @@
       "height": 1024
     }
   },
-  "98_47": {
-    "class_type": "EmptyFlux2LatentImage",
+  "98_99": {
+    "class_type": "PrimitiveInt",
     "inputs": {
-      "width": 1024,
-      "height": 1024,
-      "batch_size": 1
+      "value": 8,
+      "control_after_generate": "fixed"
     }
   },
-  "98_25": {
-    "class_type": "RandomNoise",
+  "98_100": {
+    "class_type": "PrimitiveInt",
     "inputs": {
-      "noise_seed": 978636419372261,
-      "control_after_generate": "randomize"
-    }
-  },
-  "98_6": {
-    "class_type": "CLIPTextEncode",
-    "inputs": {
-      "clip": [
-        "98_38",
-        0
-      ],
-      "text": "high fashion, vintage couture, street photography, luxury fashion shoot, neo brutalist architecture, pastel paints"
+      "value": 20,
+      "control_after_generate": "fixed"
     }
   },
   "98_101": {
     "class_type": "LoraLoaderModelOnly",
     "inputs": {
+      "lora_name": "Flux_2-Turbo-LoRA_comfyui.safetensors",
+      "strength_model": 1,
       "model": [
         "98_12",
         0
-      ],
-      "lora_name": "Flux_2-Turbo-LoRA_comfyui.safetensors",
-      "strength_model": 1
+      ]
     }
   },
   "98_102": {
@@ -152,20 +173,6 @@
         "98_104",
         0
       ]
-    }
-  },
-  "98_100": {
-    "class_type": "PrimitiveInt",
-    "inputs": {
-      "value": 20,
-      "control_after_generate": "fixed"
-    }
-  },
-  "98_99": {
-    "class_type": "PrimitiveInt",
-    "inputs": {
-      "value": 8,
-      "control_after_generate": "fixed"
     }
   },
   "98_103": {
@@ -189,13 +196,6 @@
     "class_type": "PrimitiveBoolean",
     "inputs": {
       "value": false
-    }
-  },
-  "98_12": {
-    "class_type": "UNETLoader",
-    "inputs": {
-      "unet_name": "flux2_dev_fp8mixed.safetensors",
-      "weight_dtype": "default"
     }
   }
 }

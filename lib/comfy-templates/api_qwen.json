@@ -2,28 +2,28 @@
   "9": {
     "class_type": "SaveImage",
     "inputs": {
+      "filename_prefix": "Qwen_Edit_2511_systms_action",
       "images": [
         "170_158",
         0
-      ],
-      "filename_prefix": "Qwen_Edit_2511_systms_action"
+      ]
     }
   },
   "223": {
     "class_type": "LoadImage",
     "inputs": {
       "image": "sam.webp",
-      "upload_to_directory": "image"
+      "upload": "image"
     }
   },
   "170_145": {
     "class_type": "ModelSamplingAuraFlow",
     "inputs": {
+      "shift": 3.1,
       "model": [
         "170_222",
         0
-      ],
-      "shift": 3.1
+      ]
     }
   },
   "170_146": {
@@ -35,26 +35,27 @@
   "170_147": {
     "class_type": "FluxKontextMultiReferenceLatentMethod",
     "inputs": {
+      "method": "index_timestep_zero",
       "conditioning": [
         "170_149",
         0
-      ],
-      "method": "index_timestep_zero"
+      ]
     }
   },
   "170_148": {
     "class_type": "FluxKontextMultiReferenceLatentMethod",
     "inputs": {
+      "method": "index_timestep_zero",
       "conditioning": [
         "170_151",
         0
-      ],
-      "method": "index_timestep_zero"
+      ]
     }
   },
   "170_149": {
     "class_type": "TextEncodeQwenImageEditPlus",
     "inputs": {
+      "prompt": "",
       "clip": [
         "170_162",
         0
@@ -66,13 +67,13 @@
       "image1": [
         "170_160",
         0
-      ],
-      "prompt": ""
+      ]
     }
   },
   "170_151": {
     "class_type": "TextEncodeQwenImageEditPlus",
     "inputs": {
+      "prompt": "make horns on his head, keep the photo realistic and also add a text below : sam altman\n",
       "clip": [
         "170_162",
         0
@@ -84,30 +85,29 @@
       "image1": [
         "170_160",
         0
-      ],
-      "prompt": "make horns on his head, keep the photo realistic and also add a text below : sam altman\n"
+      ]
     }
   },
   "170_152": {
     "class_type": "CFGNorm",
     "inputs": {
+      "strength": 1,
+      "use_ema": false,
       "model": [
         "170_145",
         0
-      ],
-      "strength": 1,
-      "use_ema": false
+      ]
     }
   },
   "170_153": {
     "class_type": "LoraLoaderModelOnly",
     "inputs": {
+      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "strength_model": 1,
       "model": [
         "170_152",
         0
-      ],
-      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
-      "strength_model": 1
+      ]
     }
   },
   "170_154": {
@@ -131,6 +131,28 @@
       ],
       "vae": [
         "170_146",
+        0
+      ]
+    }
+  },
+  "170_158": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "170_169",
+        0
+      ],
+      "vae": [
+        "170_146",
+        0
+      ]
+    }
+  },
+  "170_160": {
+    "class_type": "FluxKontextImageScale",
+    "inputs": {
+      "image": [
+        "223",
         0
       ]
     }
@@ -167,26 +189,6 @@
       ]
     }
   },
-  "170_165": {
-    "class_type": "PrimitiveInt",
-    "inputs": {
-      "value": 4,
-      "control_after_generate": "fixed"
-    }
-  },
-  "170_166": {
-    "class_type": "PrimitiveInt",
-    "inputs": {
-      "value": 40,
-      "control_after_generate": "fixed"
-    }
-  },
-  "170_168": {
-    "class_type": "PrimitiveBoolean",
-    "inputs": {
-      "value": true
-    }
-  },
   "170_164": {
     "class_type": "ComfySwitchNode",
     "inputs": {
@@ -202,6 +204,20 @@
         "170_168",
         0
       ]
+    }
+  },
+  "170_165": {
+    "class_type": "PrimitiveInt",
+    "inputs": {
+      "value": 4,
+      "control_after_generate": "fixed"
+    }
+  },
+  "170_166": {
+    "class_type": "PrimitiveInt",
+    "inputs": {
+      "value": 40,
+      "control_after_generate": "fixed"
     }
   },
   "170_167": {
@@ -221,9 +237,28 @@
       ]
     }
   },
+  "170_168": {
+    "class_type": "PrimitiveBoolean",
+    "inputs": {
+      "value": true
+    }
+  },
   "170_169": {
     "class_type": "KSampler",
     "inputs": {
+      "seed": 318693523635328,
+      "control_after_generate": "randomize",
+      "steps": [
+        "170_167",
+        0
+      ],
+      "cfg": [
+        "170_164",
+        0
+      ],
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
       "model": [
         "170_163",
         0
@@ -239,53 +274,18 @@
       "latent_image": [
         "170_156",
         0
-      ],
-      "steps": [
-        "170_167",
-        0
-      ],
-      "cfg": [
-        "170_164",
-        0
-      ],
-      "seed": 318693523635328,
-      "control_after_generate": "randomize",
-      "sampler_name": "euler",
-      "scheduler": "simple",
-      "denoise": 1
-    }
-  },
-  "170_158": {
-    "class_type": "VAEDecode",
-    "inputs": {
-      "samples": [
-        "170_169",
-        0
-      ],
-      "vae": [
-        "170_146",
-        0
-      ]
-    }
-  },
-  "170_160": {
-    "class_type": "FluxKontextImageScale",
-    "inputs": {
-      "image": [
-        "223",
-        0
       ]
     }
   },
   "170_222": {
     "class_type": "LoraLoaderModelOnly",
     "inputs": {
+      "lora_name": "QWEN_EDIT_ACTION_V1.safetensors",
+      "strength_model": 1,
       "model": [
         "170_161",
         0
-      ],
-      "lora_name": "QWEN_EDIT_ACTION_V1.safetensors",
-      "strength_model": 1
+      ]
     }
   }
 }

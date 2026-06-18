@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
+import type { PanelImperativeHandle } from "react-resizable-panels";
 
 import { AssetSidebar, type AssetItem, type AssetFolder } from "./asset-sidebar";
 import { PreviewPanel, type GenerationState } from "./preview-panel";
@@ -53,6 +54,9 @@ export function StudioLayout() {
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
 
+  const leftPanelRef = useRef<PanelImperativeHandle>(null);
+  const rightPanelRef = useRef<PanelImperativeHandle>(null);
+
   // Studio Asset States
   const [folders, setFolders] = useState<AssetFolder[]>(DEFAULT_FOLDERS);
   const [rootItems, setRootItems] = useState<AssetItem[]>(DEFAULT_ROOT_ITEMS);
@@ -67,9 +71,60 @@ export function StudioLayout() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
+  // Sidebar toggle methods using refs to prevent full re-renders and unmounts
+  const toggleLeft = useCallback(() => {
+    const panel = leftPanelRef.current;
+    if (panel) {
+      if (panel.isCollapsed()) {
+        panel.expand();
+        setLeftOpen(true);
+      } else {
+        panel.collapse();
+        setLeftOpen(false);
+      }
+    }
+  }, []);
+
+  const toggleRight = useCallback(() => {
+    const panel = rightPanelRef.current;
+    if (panel) {
+      if (panel.isCollapsed()) {
+        panel.expand();
+        setRightOpen(true);
+      } else {
+        panel.collapse();
+        setRightOpen(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     setIsMounted(true);
-    
+
+    // Load directories and library items from LocalStorage on mount
+    const savedFolders = localStorage.getItem("krum-studio-folders");
+    if (savedFolders) {
+      try {
+        setFolders(JSON.parse(savedFolders));
+      } catch (e) {
+        console.error("Failed to restore folders from LocalStorage:", e);
+      }
+    }
+
+    const savedRootItems = localStorage.getItem("krum-studio-rootItems");
+    if (savedRootItems) {
+      try {
+        const parsed = JSON.parse(savedRootItems);
+        const formatted = parsed.map((item: any) => ({
+          ...item,
+          createdAt: new Date(item.createdAt),
+        }));
+        setRootItems(formatted);
+      } catch (e) {
+        console.error("Failed to restore rootItems from LocalStorage:", e);
+      }
+    }
+
     // Fetch actual generated files from disk
     const fetchGeneratedAssets = async () => {
       try {
@@ -92,7 +147,7 @@ export function StudioLayout() {
         console.error("Failed to load actual generated assets:", err);
       }
     };
-    
+
     fetchGeneratedAssets();
 
     return () => {
@@ -100,6 +155,19 @@ export function StudioLayout() {
       if (socketRef.current) socketRef.current.close();
     };
   }, []);
+
+  // Save asset lists to LocalStorage on modification (after mount)
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem("krum-studio-folders", JSON.stringify(folders));
+    }
+  }, [folders, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem("krum-studio-rootItems", JSON.stringify(rootItems));
+    }
+  }, [rootItems, isMounted]);
 
   // Asset selection
   const handleSelect = useCallback((id: string) => {
@@ -153,6 +221,8 @@ export function StudioLayout() {
       inputImageFilename = selectedAsset.url;
     }
 
+    const selectedAssetPrompt = selectedAsset?.prompt || undefined;
+
     setSelectedAsset(null);
     setGeneration({
       status: "dispatched",
@@ -176,6 +246,7 @@ export function StudioLayout() {
           prompt,
           settings,
           inputImageFilename,
+          selectedAssetPrompt,
         }),
       });
 
@@ -237,6 +308,10 @@ export function StudioLayout() {
             const { node, output, prompt_id: msgPromptId } = message.data;
             if (msgPromptId === prompt_id) {
               console.log(`Node ${node} executed. Outputs:`, output);
+
+              if (!output) {
+                return;
+              }
 
               // Look for any output file in outputs
               let filename = "";
@@ -390,7 +465,7 @@ export function StudioLayout() {
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={() => setLeftOpen((prev) => !prev)}
+          onClick={toggleLeft}
           className={cn("size-7", leftOpen ? "text-foreground" : "text-muted-foreground")}
           title="Toggle library sidebar"
         >
@@ -424,7 +499,7 @@ export function StudioLayout() {
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={() => setRightOpen((prev) => !prev)}
+          onClick={toggleRight}
           className={cn("size-7", rightOpen ? "text-foreground" : "text-muted-foreground")}
           title="Toggle AI side panel"
         >
@@ -435,50 +510,69 @@ export function StudioLayout() {
       {/* ── Sidebars & Main Viewport ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         <ResizablePanelGroup
-          key={`${leftOpen}-${rightOpen}`}
           orientation="horizontal"
           className="flex-1 min-h-0"
           style={{ height: "100%" }}
         >
           {/* Left panel (Assets) */}
-          {leftOpen && (
-            <ResizablePanel defaultSize="18%" minSize="14%" maxSize="28%">
-              <div className="h-full overflow-hidden">
-                <AssetSidebar
-                  folders={folders}
-                  rootItems={rootItems}
-                  selectedId={selectedAsset?.id || null}
-                  onSelect={handleSelect}
-                  onDelete={handleDelete}
-                />
-              </div>
-            </ResizablePanel>
-          )}
-          {leftOpen && <ResizableHandle withHandle />}
+          <ResizablePanel
+            panelRef={leftPanelRef}
+            collapsible
+            onResize={(size) => {
+              setLeftOpen(size.asPercentage > 0);
+            }}
+            defaultSize="18%"
+            minSize="14%"
+            maxSize="28%"
+          >
+            <div className="h-full overflow-hidden">
+              <AssetSidebar
+                folders={folders}
+                rootItems={rootItems}
+                selectedId={selectedAsset?.id || null}
+                onSelect={handleSelect}
+                onDelete={handleDelete}
+              />
+            </div>
+          </ResizablePanel>
+          <ResizableHandle
+            disabled={!leftOpen}
+            className={cn(!leftOpen && "hidden")}
+            withHandle
+          />
 
           {/* Middle panel (Workspace Canvas) */}
-          <ResizablePanel
-            defaultSize={leftOpen && rightOpen ? "52%" : rightOpen ? "70%" : leftOpen ? "82%" : "100%"}
-            minSize="30%"
-          >
+          <ResizablePanel minSize={30}>
             <div className="h-full overflow-hidden">
               <PreviewPanel activeAsset={activeAssetToPreview} generation={generation} />
             </div>
           </ResizablePanel>
 
           {/* Right panel (AI control) */}
-          {rightOpen && <ResizableHandle withHandle />}
-          {rightOpen && (
-            <ResizablePanel defaultSize="30%" minSize="22%" maxSize="44%">
-              <div className="h-full overflow-hidden">
-                <AiPanel
-                  generation={generation}
-                  onGenerate={handleGenerate}
-                  onClose={() => setRightOpen(false)}
-                />
-              </div>
-            </ResizablePanel>
-          )}
+          <ResizableHandle
+            disabled={!rightOpen}
+            className={cn(!rightOpen && "hidden")}
+            withHandle
+          />
+          <ResizablePanel
+            panelRef={rightPanelRef}
+            collapsible
+            onResize={(size) => {
+              setRightOpen(size.asPercentage > 0);
+            }}
+            defaultSize="30%"
+            minSize="22%"
+            maxSize="44%"
+          >
+            <div className="h-full overflow-hidden">
+              <AiPanel
+                generation={generation}
+                selectedAsset={selectedAsset}
+                onGenerate={handleGenerate}
+                onClose={toggleRight}
+              />
+            </div>
+          </ResizablePanel>
         </ResizablePanelGroup>
       </div>
     </div>

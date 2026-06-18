@@ -59,6 +59,9 @@ import {
 } from "@/components/ai-elements/model-selector";
 
 import type { GenerationState } from "./preview-panel";
+import type { AssetItem } from "./asset-sidebar";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 // Types
 export type GenType = "t2i" | "t2v" | "i2v" | "i2i";
@@ -71,6 +74,9 @@ export interface GenSettings {
   width: number;
   height: number;
   llmProvider: "openrouter" | "llamacpp";
+  duration?: number;
+  fps?: number;
+  useEnhancer?: boolean;
 }
 
 const GEN_TYPES: { id: GenType; label: string; description: string }[] = [
@@ -111,11 +117,12 @@ const INITIAL_WELCOME: ChatMessage[] = [
 
 interface AiPanelProps {
   generation: GenerationState;
+  selectedAsset?: AssetItem | null;
   onGenerate: (prompt: string, settings: GenSettings) => void;
   onClose?: () => void;
 }
 
-export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
+export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPanelProps) {
   const [activeTab, setActiveTab] = useState<"chat" | "settings">("chat");
   const [settings, setSettings] = useState<GenSettings>({
     type: "t2i",
@@ -125,18 +132,22 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
     width: 1024,
     height: 1024,
     llmProvider: "llamacpp",
+    useEnhancer: true,
   });
+
+  const [directPrompt, setDirectPrompt] = useState("");
 
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_WELCOME);
   const [modelOpen, setModelOpen] = useState(false);
   const [llmModelOpen, setLlmModelOpen] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   const modelsForType = MODELS[settings.type] || [];
   const currentModel = modelsForType.find((m) => m.id === settings.model) || modelsForType[0];
 
   // Sync default model when generation type changes
-  const handleTypeChange = (type: GenType) => {
+  const handleTypeChange = useCallback((type: GenType) => {
     const defaultModel = MODELS[type]?.[0]?.id || "";
     const isVideo = type === "t2v" || type === "i2v";
     setSettings((prev) => ({
@@ -145,13 +156,87 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
       model: defaultModel,
       width: isVideo ? 768 : 1024,
       height: isVideo ? 512 : 1024,
+      duration: isVideo ? 5 : undefined,
+      fps: isVideo ? 25 : undefined,
     }));
-  };
+  }, []);
+
+  // Restore settings and conversations from LocalStorage on mount
+  useEffect(() => {
+    setIsMounted(true);
+
+    const savedSettings = localStorage.getItem("krum-studio-settings");
+    if (savedSettings) {
+      try {
+        setSettings(JSON.parse(savedSettings));
+      } catch (e) {
+        console.error("Failed to restore settings from LocalStorage:", e);
+      }
+    }
+
+    const savedMessages = localStorage.getItem("krum-studio-messages");
+    if (savedMessages) {
+      try {
+        setMessages(JSON.parse(savedMessages));
+      } catch (e) {
+        console.error("Failed to restore messages from LocalStorage:", e);
+      }
+    }
+
+    const savedTab = localStorage.getItem("krum-studio-active-tab");
+    if (savedTab) {
+      setActiveTab(savedTab as "chat" | "settings");
+    }
+  }, []);
+
+  // Save changes to LocalStorage after mount
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem("krum-studio-settings", JSON.stringify(settings));
+    }
+  }, [settings, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem("krum-studio-messages", JSON.stringify(messages));
+    }
+  }, [messages, isMounted]);
+
+  useEffect(() => {
+    if (isMounted) {
+      localStorage.setItem("krum-studio-active-tab", activeTab);
+    }
+  }, [activeTab, isMounted]);
 
   const isGenerating = generation.status === "dispatched" || generation.status === "generating";
 
+  const handleDirectGenerate = useCallback(() => {
+    if (!directPrompt.trim() || isGenerating) return;
+    const isVideo = settings.type === "t2v" || settings.type === "i2v";
+    const defaultModel = MODELS[settings.type]?.[0]?.id || "";
+    
+    onGenerate(directPrompt, {
+      ...settings,
+      model: settings.model ?? defaultModel,
+      duration: isVideo ? (settings.duration ?? 5) : undefined,
+      fps: isVideo ? (settings.fps ?? 25) : undefined,
+    });
+  }, [directPrompt, settings, onGenerate, isGenerating]);
+
   const handleSend = useCallback(async (msg: PromptInputMessage) => {
     if (!msg.text.trim() || chatLoading || isGenerating) return;
+
+    if (settings.useEnhancer === false) {
+      const isVideo = settings.type === "t2v" || settings.type === "i2v";
+      const defaultModel = MODELS[settings.type]?.[0]?.id || "";
+      onGenerate(msg.text, {
+        ...settings,
+        model: settings.model ?? defaultModel,
+        duration: isVideo ? (settings.duration ?? 5) : undefined,
+        fps: isVideo ? (settings.fps ?? 25) : undefined,
+      });
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: `usr-${Date.now()}`,
@@ -183,12 +268,23 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
         body: JSON.stringify({
           messages: updatedMessages,
           settings,
+          hasSelectedImage: !!selectedAsset && selectedAsset.type === "image",
+          selectedAssetPrompt: selectedAsset?.prompt || undefined,
         }),
       });
 
       if (!res.ok) {
         const errText = await res.text().catch(() => "Failed to communicate with AI Creative Director");
         throw new Error(errText);
+      }
+
+      // Check if server classified the request into a different mode/API
+      let activeType = settings.type;
+      const detectedType = res.headers.get("x-detected-type");
+      if (detectedType && detectedType !== settings.type) {
+        console.log(`[AI Panel] Classification type override: ${detectedType}`);
+        activeType = detectedType as GenType;
+        handleTypeChange(activeType);
       }
 
       const reader = res.body?.getReader();
@@ -227,16 +323,37 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
       // Once streaming finishes, check if we need to trigger generation
       const triggerIndex = accumulatedText.indexOf("[TRIGGER_GENERATION]");
       if (triggerIndex !== -1) {
-        const jsonPart = accumulatedText.substring(triggerIndex + "[TRIGGER_GENERATION]".length).trim();
+        let jsonPart = accumulatedText.substring(triggerIndex + "[TRIGGER_GENERATION]".length).trim();
+        
+        // Robust JSON extraction: locate the outermost curly braces
+        const firstBrace = jsonPart.indexOf("{");
+        const lastBrace = jsonPart.lastIndexOf("}");
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+          jsonPart = jsonPart.substring(firstBrace, lastBrace + 1);
+        }
+
         try {
           const parsed = JSON.parse(jsonPart);
-          console.log("AI Director triggered generation with enhanced prompt:", parsed.enhancedPrompt);
-          onGenerate(parsed.enhancedPrompt, {
-            ...settings,
+          
+          const finalPrompt = typeof parsed.enhancedPrompt === "object"
+            ? JSON.stringify(parsed.enhancedPrompt)
+            : String(parsed.enhancedPrompt || "");
+
+          console.log("AI Director triggered generation with enhanced prompt:", finalPrompt);
+          
+          const defaultModel = MODELS[activeType]?.[0]?.id || "";
+          const isVideo = activeType === "t2v" || activeType === "i2v";
+
+          onGenerate(finalPrompt, {
+            type: activeType,
+            model: parsed.model ?? defaultModel,
             steps: parsed.steps ?? settings.steps,
             guidance: parsed.guidance ?? settings.guidance,
-            width: parsed.width ?? settings.width,
-            height: parsed.height ?? settings.height,
+            width: parsed.width ?? (isVideo ? 768 : 1024),
+            height: parsed.height ?? (isVideo ? 512 : 1024),
+            duration: isVideo ? (parsed.duration ?? 5) : undefined,
+            fps: isVideo ? (parsed.fps ?? 25) : undefined,
+            llmProvider: settings.llmProvider,
           });
         } catch (e) {
           console.warn("Failed to parse local LLM trigger JSON:", e);
@@ -257,7 +374,7 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
     } finally {
       setChatLoading(false);
     }
-  }, [messages, settings, onGenerate, chatLoading, isGenerating]);
+  }, [messages, settings, onGenerate, chatLoading, isGenerating, selectedAsset, handleTypeChange]);
 
   const promptInputStatus = chatLoading
     ? "submitted"
@@ -415,49 +532,84 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
                 </ModelSelector>
               </div>
 
-              {/* LLM Enhancer Model Select */}
-              <div className="space-y-2">
-                <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Prompt Enhancer LLM</Label>
-                <ModelSelector open={llmModelOpen} onOpenChange={setLlmModelOpen}>
-                  <ModelSelectorTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full justify-between text-[11px] h-8.5 bg-background/50 border-border/60 px-2.5">
-                      <div className="flex items-center gap-2">
-                        <ModelSelectorLogo provider={settings.llmProvider === "llamacpp" ? "llama" : "openrouter"} className="size-3.5" />
-                        <span>{settings.llmProvider === "llamacpp" ? "Llama.cpp (Local)" : "OpenRouter (Cloud)"}</span>
-                      </div>
-                      <ChevronRightIcon className="size-3.5 rotate-90 text-muted-foreground" />
-                    </Button>
-                  </ModelSelectorTrigger>
-                  <ModelSelectorContent>
-                    <ModelSelectorInput placeholder="Filter LLMs..." />
-                    <ModelSelectorList>
-                      <ModelSelectorEmpty>No model found.</ModelSelectorEmpty>
-                      <ModelSelectorGroup heading="LLM ASSISTANTS">
-                        <ModelSelectorItem
-                          value="openrouter"
-                          onSelect={() => {
-                            setSettings((s) => ({ ...s, llmProvider: "openrouter" }));
-                            setLlmModelOpen(false);
-                          }}
-                        >
-                          <ModelSelectorLogo provider="openrouter" />
-                          <ModelSelectorName>OpenRouter (Cloud LLM)</ModelSelectorName>
-                        </ModelSelectorItem>
-                        <ModelSelectorItem
-                          value="llamacpp"
-                          onSelect={() => {
-                            setSettings((s) => ({ ...s, llmProvider: "llamacpp" }));
-                            setLlmModelOpen(false);
-                          }}
-                        >
-                          <ModelSelectorLogo provider="llama" />
-                          <ModelSelectorName>Llama.cpp (Local LLM Server)</ModelSelectorName>
-                        </ModelSelectorItem>
-                      </ModelSelectorGroup>
-                    </ModelSelectorList>
-                  </ModelSelectorContent>
-                </ModelSelector>
+              {/* AI Enhancer Switch */}
+              <div className="flex items-center justify-between p-2.5 rounded-lg border border-border/40 bg-card/25">
+                <div className="space-y-0.5">
+                  <Label className="text-[10px] font-semibold text-foreground uppercase tracking-wider">AI Prompt Enhancer</Label>
+                  <p className="text-[9px] text-muted-foreground font-light">Automatically refine prompts using LLM</p>
+                </div>
+                <Switch
+                  checked={settings.useEnhancer !== false}
+                  onCheckedChange={(checked) => {
+                    setSettings((s) => ({ ...s, useEnhancer: checked }));
+                  }}
+                />
               </div>
+
+              {settings.useEnhancer !== false ? (
+                /* LLM Enhancer Model Select */
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Prompt Enhancer LLM</Label>
+                  <ModelSelector open={llmModelOpen} onOpenChange={setLlmModelOpen}>
+                    <ModelSelectorTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full justify-between text-[11px] h-8.5 bg-background/50 border-border/60 px-2.5">
+                        <div className="flex items-center gap-2">
+                          <ModelSelectorLogo provider={settings.llmProvider === "llamacpp" ? "llama" : "openrouter"} className="size-3.5" />
+                          <span>{settings.llmProvider === "llamacpp" ? "Llama.cpp (Local)" : "OpenRouter (Cloud)"}</span>
+                        </div>
+                        <ChevronRightIcon className="size-3.5 rotate-90 text-muted-foreground" />
+                      </Button>
+                    </ModelSelectorTrigger>
+                    <ModelSelectorContent>
+                      <ModelSelectorInput placeholder="Filter LLMs..." />
+                      <ModelSelectorList>
+                        <ModelSelectorEmpty>No model found.</ModelSelectorEmpty>
+                        <ModelSelectorGroup heading="LLM ASSISTANTS">
+                          <ModelSelectorItem
+                            value="openrouter"
+                            onSelect={() => {
+                              setSettings((s) => ({ ...s, llmProvider: "openrouter" }));
+                              setLlmModelOpen(false);
+                            }}
+                          >
+                            <ModelSelectorLogo provider="openrouter" />
+                            <ModelSelectorName>OpenRouter (Cloud LLM)</ModelSelectorName>
+                          </ModelSelectorItem>
+                          <ModelSelectorItem
+                            value="llamacpp"
+                            onSelect={() => {
+                              setSettings((s) => ({ ...s, llmProvider: "llamacpp" }));
+                              setLlmModelOpen(false);
+                            }}
+                          >
+                            <ModelSelectorLogo provider="llama" />
+                            <ModelSelectorName>Llama.cpp (Local LLM Server)</ModelSelectorName>
+                          </ModelSelectorItem>
+                        </ModelSelectorGroup>
+                      </ModelSelectorList>
+                    </ModelSelectorContent>
+                  </ModelSelector>
+                </div>
+              ) : (
+                /* Direct Prompt Card */
+                <div className="space-y-2 border border-primary/20 rounded-lg p-3 bg-primary/5">
+                  <Label className="text-[10px] font-semibold text-primary uppercase tracking-wider">Direct Prompt Generation</Label>
+                  <Textarea
+                    placeholder="Enter your prompt (bypasses AI enhancement)..."
+                    value={directPrompt}
+                    onChange={(e) => setDirectPrompt(e.target.value)}
+                    className="min-h-[70px] text-xs resize-none bg-background/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary/40"
+                  />
+                  <Button
+                    onClick={handleDirectGenerate}
+                    disabled={!directPrompt.trim() || isGenerating}
+                    className="w-full text-xs h-8 gap-1.5"
+                  >
+                    <SparklesIcon className="size-3.5" />
+                    Generate Directly
+                  </Button>
+                </div>
+              )}
 
               <Separator className="bg-border/60" />
 
@@ -520,6 +672,45 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Duration (seconds) - Video modes only */}
+                  {(settings.type === "t2v" || settings.type === "i2v") && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <Label className="text-muted-foreground">Video Duration</Label>
+                        <span className="font-mono text-[11px] text-foreground">{settings.duration || 5}s</span>
+                      </div>
+                      <Slider
+                        min={1}
+                        max={100}
+                        step={1}
+                        value={[settings.duration || 5]}
+                        onValueChange={([val]) => setSettings((s) => ({ ...s, duration: val }))}
+                      />
+                    </div>
+                  )}
+
+                  {/* FPS - Video modes only */}
+                  {(settings.type === "t2v" || settings.type === "i2v") && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground">Frames Per Second (FPS)</Label>
+                      <Select
+                        value={String(settings.fps || 25)}
+                        onValueChange={(val) => {
+                          setSettings((s) => ({ ...s, fps: Number(val) }));
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="24">24 FPS (Cinematic)</SelectItem>
+                          <SelectItem value="25">25 FPS (PAL Standard)</SelectItem>
+                          <SelectItem value="30">30 FPS (NTSC Standard)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </CollapsibleContent>
               </Collapsible>
             </div>
@@ -532,7 +723,7 @@ export function AiPanel({ generation, onGenerate, onClose }: AiPanelProps) {
         <PromptInput onSubmit={handleSend} className="w-full">
           <PromptInputBody>
             <PromptInputTextarea
-              placeholder="Describe what you want to generate..."
+              placeholder={settings.useEnhancer !== false ? "Describe what you want to generate..." : "Direct Prompt: Enter prompt to generate directly..."}
               className="min-h-[50px] max-h-[120px] text-xs resize-none bg-background/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary/40"
             />
           </PromptInputBody>

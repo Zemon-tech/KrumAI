@@ -28,7 +28,7 @@ async function uploadToComfyUI(buffer: Buffer, originalFilename: string): Promis
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { prompt, settings, inputImageFilename } = body;
+    const { prompt, settings, inputImageFilename, selectedAssetPrompt } = body;
 
     if (!prompt) {
       return NextResponse.json(
@@ -76,24 +76,35 @@ export async function POST(request: Request) {
       }
     }
 
-    // Call OpenRouter to enhance the prompt and settings
-    const enhancement = await enhancePrompt(prompt, settings);
+    let finalPrompt = prompt;
+    let updatedSettings = { ...settings };
 
-    const updatedSettings = {
-      ...settings,
-      steps: enhancement.steps,
-      guidance: enhancement.guidance,
-      width: enhancement.width,
-      height: enhancement.height,
-      // Video-specific fields (only present for t2v / i2v)
-      ...(enhancement.duration !== undefined && { duration: enhancement.duration }),
-      ...(enhancement.fps !== undefined && { fps: enhancement.fps }),
-    };
+    if (settings.useEnhancer !== false) {
+      // Call OpenRouter to enhance the prompt and settings
+      const enhancement = await enhancePrompt(prompt, settings, selectedAssetPrompt);
+      finalPrompt = enhancement.enhancedPrompt;
+      updatedSettings = {
+        ...settings,
+        steps: enhancement.steps,
+        guidance: enhancement.guidance,
+        width: enhancement.width,
+        height: enhancement.height,
+        // Video-specific fields (only present for t2v / i2v)
+        ...(enhancement.duration !== undefined && { duration: enhancement.duration }),
+        ...(enhancement.fps !== undefined && { fps: enhancement.fps }),
+      };
+    }
+
+    // Clean up settings for image generation models (t2i, i2i) to avoid sending video-specific parameters
+    if (updatedSettings.type === "t2i" || updatedSettings.type === "i2i") {
+      delete updatedSettings.duration;
+      delete updatedSettings.fps;
+    }
 
     // Dynamic graph parsing based on settings
     let graph: Record<string, any>;
     try {
-      graph = parseGraph(enhancement.enhancedPrompt, updatedSettings, comfyImageName);
+      graph = parseGraph(finalPrompt, updatedSettings, comfyImageName);
     } catch (err: any) {
       return NextResponse.json(
         { error: err.message || "Failed to parse workflow graph" },
@@ -132,7 +143,7 @@ export async function POST(request: Request) {
       prompt_id: data.prompt_id,
       client_id: clientId,
       ws_url: wsUrl,
-      enhanced_prompt: enhancement.enhancedPrompt,
+      enhanced_prompt: settings.useEnhancer !== false ? finalPrompt : undefined,
       settings: updatedSettings,
     });
   } catch (error: any) {

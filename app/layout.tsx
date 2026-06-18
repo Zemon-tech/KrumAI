@@ -25,6 +25,7 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable}  h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
