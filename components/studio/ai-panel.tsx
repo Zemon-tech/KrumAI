@@ -62,6 +62,7 @@ import type { GenerationState } from "./preview-panel";
 import type { AssetItem } from "./asset-sidebar";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 
 // Types
 export type GenType = "t2i" | "t2v" | "i2v" | "i2i";
@@ -77,7 +78,230 @@ export interface GenSettings {
   duration?: number;
   fps?: number;
   useEnhancer?: boolean;
+
+  // User-Facing Parameters (Safe)
+  prompt?: string;
+  negativePrompt?: string;
+  qualityLevel?: "Draft" | "Standard" | "High" | "Ultra";
+  styleStrength?: number;
+  promptEnhancement?: number;
+  creativity?: number;
+  detailLevel?: number;
+  faceDetail?: number;
+  lightingStyle?: "Auto" | "Natural" | "Studio" | "Cinematic" | "Golden Hour" | "Dramatic";
+  cameraType?: "Auto" | "Smartphone" | "DSLR" | "Cinema" | "Macro";
+  aspectRatio?: "Auto" | "1:1" | "16:9" | "9:16" | "3:2" | "4:5";
+  resolution?: "Auto" | "HD" | "2K" | "4K";
+  colorStyle?: "Natural" | "Vibrant" | "Muted" | "Filmic";
+  sharpness?: number;
+  realism?: number;
+  upscaleOutput?: boolean;
+  upscaleFactor?: "1x" | "2x" | "4x";
+  turboMode?: boolean;
+  presetStyle?: string;
 }
+
+export function calculateDimensions(type: GenType, aspectRatio: string, resolution: string) {
+  const isVideo = type === "t2v" || type === "i2v";
+  
+  // Base maximum dimension
+  let maxDim = isVideo ? 768 : 1024;
+  
+  // Adjust base size by resolution setting
+  if (resolution === "HD") {
+    maxDim = isVideo ? 1024 : 1024;
+  } else if (resolution === "2K") {
+    maxDim = isVideo ? 1280 : 2048;
+  } else if (resolution === "4K") {
+    maxDim = isVideo ? 1920 : 3840;
+  }
+
+  // Calculate dimensions based on aspect ratio
+  if (aspectRatio === "1:1") {
+    return { width: maxDim, height: maxDim };
+  } else if (aspectRatio === "16:9") {
+    return { width: maxDim, height: isVideo ? 512 : Math.round(maxDim * 9 / 16) };
+  } else if (aspectRatio === "9:16") {
+    return { width: isVideo ? 512 : Math.round(maxDim * 9 / 16), height: maxDim };
+  } else if (aspectRatio === "3:2") {
+    return { width: maxDim, height: Math.round(maxDim * 2 / 3) };
+  } else if (aspectRatio === "4:5") {
+    return { width: Math.round(maxDim * 4 / 5), height: maxDim };
+  }
+  
+  // Auto / Default
+  return isVideo ? { width: 768, height: 512 } : { width: 1024, height: 1024 };
+}
+
+export interface StylePreset {
+  id: string;
+  name: string;
+  description: string;
+  promptInjection: string;
+  parameters: {
+    steps?: number;
+    guidance?: number;
+    detailLevel?: number;
+    realism?: number;
+    textQuality?: number;
+  };
+}
+
+export const STYLE_PRESETS: StylePreset[] = [
+  {
+    id: "none",
+    name: "None / Custom",
+    description: "Use your own custom parameters",
+    promptInjection: "",
+    parameters: {}
+  },
+  {
+    id: "photorealistic",
+    name: "Photorealistic",
+    description: "Portraits, people, lifestyle, travel realism",
+    promptInjection: "Style: High-end commercial photography. Shot on Hasselblad X2D. 80mm lens. f/2.8 aperture. Natural realistic lighting. Authentic skin textures. Premium commercial photography. Shallow depth of field. Accurate colors.",
+    parameters: {
+      steps: 28,
+      guidance: 3.5,
+      detailLevel: 85,
+      realism: 100
+    }
+  },
+  {
+    id: "cinematic",
+    name: "Cinematic",
+    description: "Movie scenes, dramatic storytelling, film still",
+    promptInjection: "Style: Cinematic film still. Shot using anamorphic cinema lenses. Dramatic practical lighting. Volumetric atmosphere. Film-quality contrast. Natural lens characteristics. Visual storytelling.",
+    parameters: {
+      steps: 30,
+      guidance: 4.0,
+      detailLevel: 90,
+      realism: 90
+    }
+  },
+  {
+    id: "product",
+    name: "Product Showcase",
+    description: "Premium luxury product advertising shots",
+    promptInjection: "Style: Premium luxury product photography. Professional studio lighting. Clean reflections. Perfect edge definition. Commercial advertising quality. Minimal distractions.",
+    parameters: {
+      steps: 32,
+      guidance: 4.5,
+      detailLevel: 100,
+      realism: 95
+    }
+  },
+  {
+    id: "social_media",
+    name: "Social Media Design",
+    description: "Instagram posts, thumbnails, high engagement graphics",
+    promptInjection: "Style: Modern social media design. Strong visual hierarchy. Bold focal point. Clear communication. High engagement design. Professional layout.",
+    parameters: {
+      steps: 24,
+      guidance: 4.0,
+      detailLevel: 80,
+      realism: 75
+    }
+  },
+  {
+    id: "typography",
+    name: "Typography Focus",
+    description: "Banners, quote layouts, readable clear text",
+    promptInjection: "Style: Professional graphic design. Typography is the primary focus. All text must be perfectly spelled, fully readable, professionally typeset, well aligned, high contrast, visually balanced.",
+    parameters: {
+      steps: 32,
+      guidance: 5.0,
+      detailLevel: 95
+    }
+  },
+  {
+    id: "editorial",
+    name: "Luxury Editorial",
+    description: "Magazine covers, fashion editorial look",
+    promptInjection: "Style: Luxury editorial photography. Fashion magazine quality. Premium composition. Elegant posing. Sophisticated lighting. Luxury color grading.",
+    parameters: {
+      steps: 30,
+      guidance: 4.0,
+      detailLevel: 95,
+      realism: 90
+    }
+  },
+  {
+    id: "concept_art",
+    name: "AAA Concept Art",
+    description: "Sci-fi/fantasy worldbuilding, game environments",
+    promptInjection: "Style: AAA concept art. Large-scale visual design. Rich environmental storytelling. Epic composition. Advanced atmosphere. High-detail worldbuilding.",
+    parameters: {
+      steps: 35,
+      guidance: 4.5,
+      detailLevel: 100,
+      realism: 70
+    }
+  }
+];
+
+export function assembleFluxPrompt(promptText: string, settings: GenSettings): string {
+  if (settings.type !== "t2i") return promptText;
+
+  const parts: string[] = [promptText];
+
+  // Selected Style
+  if (settings.presetStyle && settings.presetStyle !== "none") {
+    const preset = STYLE_PRESETS.find((p) => p.id === settings.presetStyle);
+    if (preset && preset.promptInjection) {
+      parts.push(preset.promptInjection);
+    }
+  }
+
+  // Camera Settings
+  if (settings.cameraType && settings.cameraType !== "Auto") {
+    if (settings.cameraType === "Smartphone") {
+      parts.push("Shot on modern smartphone camera, mobile photo style.");
+    } else if (settings.cameraType === "DSLR") {
+      parts.push("Professional DSLR camera photography, sharp focus, high depth of field.");
+    } else if (settings.cameraType === "Cinema") {
+      parts.push("Shot using professional anamorphic cinema lenses, film capture look.");
+    } else if (settings.cameraType === "Macro") {
+      parts.push("Macro lens close-up photography, extreme detail capture.");
+    }
+  }
+
+  // Lighting
+  if (settings.lightingStyle && settings.lightingStyle !== "Auto") {
+    if (settings.lightingStyle === "Natural") {
+      parts.push("Soft diffused natural lighting.");
+    } else if (settings.lightingStyle === "Studio") {
+      parts.push("Controlled professional studio lighting, portrait photography setups.");
+    } else if (settings.lightingStyle === "Cinematic") {
+      parts.push("Cinematic lighting, practical lights in scene, atmospheric contrast.");
+    } else if (settings.lightingStyle === "Golden Hour") {
+      parts.push("Warm golden hour sunset lighting, soft long shadow gradients.");
+    } else if (settings.lightingStyle === "Dramatic") {
+      parts.push("Dramatic high contrast chiaroscuro lighting, dark moody shadow definition.");
+    }
+  }
+
+  // Color Style
+  if (settings.colorStyle && settings.colorStyle !== "Natural") {
+    if (settings.colorStyle === "Vibrant") {
+      parts.push("Vibrant color palette, highly saturated tones.");
+    } else if (settings.colorStyle === "Muted") {
+      parts.push("Muted color palette, earthy organic tones.");
+    } else if (settings.colorStyle === "Filmic") {
+      parts.push("Filmic color grading, vintage lift and color tones.");
+    }
+  }
+
+  // Global Quality Injection
+  parts.push(
+    "Professional composition.\nRealistic lighting and shadows.\nPhysically accurate materials.\nClean depth separation.\nPremium color grading.\nStrong visual hierarchy.\nHigh clarity.\nNatural texture detail.\nCommercial production quality."
+  );
+
+  return parts.filter(Boolean).join("\n\n");
+}
+
+
+
 
 const GEN_TYPES: { id: GenType; label: string; description: string }[] = [
   { id: "t2i", label: "Text → Image (Flux)", description: "Generate images from text prompts" },
@@ -133,6 +357,24 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
     height: 1024,
     llmProvider: "llamacpp",
     useEnhancer: true,
+    negativePrompt: "",
+    qualityLevel: "Standard",
+    styleStrength: 50,
+    promptEnhancement: 50,
+    creativity: 50,
+    detailLevel: 50,
+    faceDetail: 50,
+    lightingStyle: "Auto",
+    cameraType: "Auto",
+    aspectRatio: "Auto",
+    resolution: "Auto",
+    colorStyle: "Natural",
+    sharpness: 50,
+    realism: 50,
+    upscaleOutput: false,
+    upscaleFactor: "2x",
+    turboMode: true,
+    presetStyle: "none",
   });
 
   const [directPrompt, setDirectPrompt] = useState("");
@@ -150,16 +392,22 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
   const handleTypeChange = useCallback((type: GenType) => {
     const defaultModel = MODELS[type]?.[0]?.id || "";
     const isVideo = type === "t2v" || type === "i2v";
-    setSettings((prev) => ({
-      ...prev,
-      type,
-      model: defaultModel,
-      width: isVideo ? 768 : 1024,
-      height: isVideo ? 512 : 1024,
-      duration: isVideo ? 5 : undefined,
-      fps: isVideo ? 25 : undefined,
-    }));
+    setSettings((prev) => {
+      const currentRatio = prev.aspectRatio || "Auto";
+      const currentRes = prev.resolution || "Auto";
+      const { width, height } = calculateDimensions(type, currentRatio, currentRes);
+      return {
+        ...prev,
+        type,
+        model: defaultModel,
+        width,
+        height,
+        duration: isVideo ? 5 : undefined,
+        fps: isVideo ? 25 : undefined,
+      };
+    });
   }, []);
+
 
   // Restore settings and conversations from LocalStorage on mount
   useEffect(() => {
@@ -215,7 +463,11 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
     const isVideo = settings.type === "t2v" || settings.type === "i2v";
     const defaultModel = MODELS[settings.type]?.[0]?.id || "";
     
-    onGenerate(directPrompt, {
+    const finalPrompt = settings.type === "t2i"
+      ? assembleFluxPrompt(directPrompt, settings)
+      : directPrompt;
+
+    onGenerate(finalPrompt, {
       ...settings,
       model: settings.model ?? defaultModel,
       duration: isVideo ? (settings.duration ?? 5) : undefined,
@@ -229,7 +481,12 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
     if (settings.useEnhancer === false) {
       const isVideo = settings.type === "t2v" || settings.type === "i2v";
       const defaultModel = MODELS[settings.type]?.[0]?.id || "";
-      onGenerate(msg.text, {
+      
+      const finalPrompt = settings.type === "t2i"
+        ? assembleFluxPrompt(msg.text, settings)
+        : msg.text;
+
+      onGenerate(finalPrompt, {
         ...settings,
         model: settings.model ?? defaultModel,
         duration: isVideo ? (settings.duration ?? 5) : undefined,
@@ -345,6 +602,7 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
           const isVideo = activeType === "t2v" || activeType === "i2v";
 
           onGenerate(finalPrompt, {
+            ...settings,
             type: activeType,
             model: parsed.model ?? defaultModel,
             steps: parsed.steps ?? settings.steps,
@@ -353,7 +611,6 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
             height: parsed.height ?? (isVideo ? 512 : 1024),
             duration: isVideo ? (parsed.duration ?? 5) : undefined,
             fps: isVideo ? (parsed.fps ?? 25) : undefined,
-            llmProvider: settings.llmProvider,
           });
         } catch (e) {
           console.warn("Failed to parse local LLM trigger JSON:", e);
@@ -610,16 +867,251 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
                   </Button>
                 </div>
               )}
+              {settings.type === "t2i" && (
+                <>
+                  <Separator className="bg-border/60" />
+                  {/* SECTION: Style Presets */}
+                  <Collapsible defaultOpen className="space-y-2 animate-in fade-in duration-200">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Style Preset</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-1.5">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Select Preset Style</Label>
+                        <Select
+                          value={settings.presetStyle || "none"}
+                          onValueChange={(val) => {
+                            const preset = STYLE_PRESETS.find((p) => p.id === val);
+                            if (preset) {
+                              setSettings((s) => {
+                                const nextSettings = { ...s, presetStyle: val };
+                                if (preset.parameters.steps !== undefined) {
+                                  nextSettings.steps = preset.parameters.steps;
+                                }
+                                if (preset.parameters.guidance !== undefined) {
+                                  nextSettings.guidance = preset.parameters.guidance;
+                                }
+                                if (preset.parameters.detailLevel !== undefined) {
+                                  nextSettings.detailLevel = preset.parameters.detailLevel;
+                                }
+                                if (preset.parameters.realism !== undefined) {
+                                  nextSettings.realism = preset.parameters.realism;
+                                }
+                                return nextSettings;
+                              });
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-xs bg-background/50 border-border/60">
+                            <SelectValue placeholder="Select style preset" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STYLE_PRESETS.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                <div className="flex flex-col items-start py-0.5">
+                                  <span className="font-semibold text-[11px]">{p.name}</span>
+                                  <span className="text-[9px] text-muted-foreground/80 leading-normal">{p.description}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
 
               <Separator className="bg-border/60" />
 
-              {/* Params Collapsible */}
+              {/* SECTION: Prompts & Text Context */}
               <Collapsible defaultOpen className="space-y-2">
                 <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
-                  <span>Advanced Parameters</span>
+                  <span>Prompting & Context</span>
                   <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 pt-1.5">
+                <CollapsibleContent className="space-y-3 pt-1.5">
+                  {/* Prompt (Hidden if Enhancer is active since user uses chat) */}
+                  {settings.useEnhancer === false && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground font-medium">Core Generation Prompt</Label>
+                      <Textarea
+                        placeholder="Describe your subject and scene..."
+                        value={directPrompt}
+                        onChange={(e) => {
+                          setDirectPrompt(e.target.value);
+                          setSettings((s) => ({ ...s, prompt: e.target.value }));
+                        }}
+                        className="min-h-[60px] text-xs resize-none bg-background/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary/40"
+                      />
+                    </div>
+                  )}
+
+                  {/* Negative Prompt */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-[11px] text-muted-foreground font-medium">Negative Prompt</Label>
+                      <span className="text-[9px] text-muted-foreground/60 italic">Avoid elements</span>
+                    </div>
+                    <Textarea
+                      placeholder="e.g. text, watermark, blurry, extra limbs..."
+                      value={settings.negativePrompt || ""}
+                      onChange={(e) => setSettings((s) => ({ ...s, negativePrompt: e.target.value }))}
+                      className="min-h-[45px] text-xs resize-none bg-background/50 border-border/60 focus-visible:ring-1 focus-visible:ring-primary/40"
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Separator className="bg-border/60" />
+
+              {/* SECTION: Composition & Dimensions */}
+              <Collapsible defaultOpen className="space-y-2">
+                <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                  <span>Composition & Format</span>
+                  <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3.5 pt-1.5">
+                  {/* Aspect Ratio - Not typically customized for i2i since it follows input size */}
+                  {settings.type !== "i2i" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground font-medium">Aspect Ratio</Label>
+                      <Select
+                        value={settings.aspectRatio || "Auto"}
+                        onValueChange={(val) => {
+                          setSettings((s) => {
+                            const { width, height } = calculateDimensions(s.type, val, s.resolution || "Auto");
+                            return { ...s, aspectRatio: val as any, width, height };
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                          <SelectValue placeholder="Select ratio" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Auto">Auto (Default)</SelectItem>
+                          <SelectItem value="1:1">1:1 Square</SelectItem>
+                          <SelectItem value="16:9">16:9 Landscape</SelectItem>
+                          <SelectItem value="9:16">9:16 Portrait</SelectItem>
+                          <SelectItem value="3:2">3:2 Cinematic</SelectItem>
+                          <SelectItem value="4:5">4:5 Portrait</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Resolution */}
+                  {settings.type !== "i2i" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground font-medium">Target Resolution</Label>
+                      <Select
+                        value={settings.resolution || "Auto"}
+                        onValueChange={(val) => {
+                          setSettings((s) => {
+                            const { width, height } = calculateDimensions(s.type, s.aspectRatio || "Auto", val);
+                            return { ...s, resolution: val as any, width, height };
+                          });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                          <SelectValue placeholder="Select resolution" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Auto">Auto (Default)</SelectItem>
+                          <SelectItem value="HD">HD Quality</SelectItem>
+                          <SelectItem value="2K">2K Resolution</SelectItem>
+                          <SelectItem value="4K">4K Ultra HD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Duration - Video only */}
+                  {(settings.type === "t2v" || settings.type === "i2v") && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <Label className="text-muted-foreground">Video Duration</Label>
+                        <span className="font-mono text-[11px] text-foreground">{settings.duration || 5}s</span>
+                      </div>
+                      <Slider
+                        min={1}
+                        max={30}
+                        step={1}
+                        value={[settings.duration || 5]}
+                        onValueChange={([val]) => setSettings((s) => ({ ...s, duration: val }))}
+                      />
+                    </div>
+                  )}
+
+                  {/* FPS - Video only */}
+                  {(settings.type === "t2v" || settings.type === "i2v") && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground font-medium">Frames Per Second (FPS)</Label>
+                      <Select
+                        value={String(settings.fps || 25)}
+                        onValueChange={(val) => {
+                          setSettings((s) => ({ ...s, fps: Number(val) }));
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="24">24 FPS (Cinematic)</SelectItem>
+                          <SelectItem value="25">25 FPS (PAL Standard)</SelectItem>
+                          <SelectItem value="30">30 FPS (NTSC Standard)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Separator className="bg-border/60" />
+
+              {/* SECTION: Model Performance */}
+              <Collapsible defaultOpen className="space-y-2">
+                <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                  <span>Neural Model Settings</span>
+                  <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3.5 pt-1.5">
+                  {/* Quality Level */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] text-muted-foreground font-medium">Quality Level</Label>
+                    <Select
+                      value={settings.qualityLevel || "Standard"}
+                      onValueChange={(val) => {
+                        setSettings((s) => ({ ...s, qualityLevel: val as any }));
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Draft">Draft (Fastest)</SelectItem>
+                        <SelectItem value="Standard">Standard (Balanced)</SelectItem>
+                        <SelectItem value="High">High Quality</SelectItem>
+                        <SelectItem value="Ultra">Ultra Details</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Turbo Mode Toggle */}
+                  <div className="flex items-center justify-between p-2 rounded-lg border border-border/40 bg-card/15">
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px] text-foreground font-medium">Turbo Mode</Label>
+                      <p className="text-[9px] text-muted-foreground">Lightning-fast generation steps</p>
+                    </div>
+                    <Switch
+                      checked={settings.turboMode !== false}
+                      onCheckedChange={(checked) => {
+                        setSettings((s) => ({ ...s, turboMode: checked }));
+                      }}
+                    />
+                  </div>
+
                   {/* Steps */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
@@ -649,64 +1141,244 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
                       onValueChange={([val]) => setSettings((s) => ({ ...s, guidance: val }))}
                     />
                   </div>
+                </CollapsibleContent>
+              </Collapsible>
 
-                  {/* Aspect Ratio */}
-                  <div className="space-y-2">
-                    <Label className="text-xs text-muted-foreground">Canvas Aspect Ratio</Label>
+              <Separator className="bg-border/60" />
+
+              {/* SECTION: Aesthetic & Camera Styles */}
+              <Collapsible defaultOpen={false} className="space-y-2">
+                <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                  <span>Aesthetics & Style</span>
+                  <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3.5 pt-1.5">
+                  {/* Lighting Style */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] text-muted-foreground font-medium">Lighting Style</Label>
                     <Select
-                      value={`${settings.width}x${settings.height}`}
+                      value={settings.lightingStyle || "Auto"}
                       onValueChange={(val) => {
-                        const [w, h] = val.split("x").map(Number);
-                        setSettings((s) => ({ ...s, width: w, height: h }));
+                        setSettings((s) => ({ ...s, lightingStyle: val as any }));
                       }}
                     >
                       <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1024x1024">1:1 Square (1024 × 1024)</SelectItem>
-                        <SelectItem value="1024x576">16:9 Landscape (1024 × 576)</SelectItem>
-                        <SelectItem value="576x1024">9:16 Portrait (576 × 1024)</SelectItem>
-                        <SelectItem value="768x512">3:2 Cinematic (768 × 512)</SelectItem>
-                        <SelectItem value="512x768">2:3 Portrait (512 × 768)</SelectItem>
+                        <SelectItem value="Auto">Auto Lighting</SelectItem>
+                        <SelectItem value="Natural">Natural Light</SelectItem>
+                        <SelectItem value="Studio">Studio Portra</SelectItem>
+                        <SelectItem value="Cinematic">Cinematic Mood</SelectItem>
+                        <SelectItem value="Golden Hour">Golden Hour Glow</SelectItem>
+                        <SelectItem value="Dramatic">Dramatic Contrast</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {/* Duration (seconds) - Video modes only */}
-                  {(settings.type === "t2v" || settings.type === "i2v") && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <Label className="text-muted-foreground">Video Duration</Label>
-                        <span className="font-mono text-[11px] text-foreground">{settings.duration || 5}s</span>
-                      </div>
-                      <Slider
-                        min={1}
-                        max={100}
-                        step={1}
-                        value={[settings.duration || 5]}
-                        onValueChange={([val]) => setSettings((s) => ({ ...s, duration: val }))}
-                      />
-                    </div>
-                  )}
-
-                  {/* FPS - Video modes only */}
-                  {(settings.type === "t2v" || settings.type === "i2v") && (
-                    <div className="space-y-2">
-                      <Label className="text-xs text-muted-foreground">Frames Per Second (FPS)</Label>
+                  {/* Camera Type */}
+                  {settings.type !== "i2i" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] text-muted-foreground font-medium">Camera Lens Type</Label>
                       <Select
-                        value={String(settings.fps || 25)}
+                        value={settings.cameraType || "Auto"}
                         onValueChange={(val) => {
-                          setSettings((s) => ({ ...s, fps: Number(val) }));
+                          setSettings((s) => ({ ...s, cameraType: val as any }));
                         }}
                       >
                         <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="24">24 FPS (Cinematic)</SelectItem>
-                          <SelectItem value="25">25 FPS (PAL Standard)</SelectItem>
-                          <SelectItem value="30">30 FPS (NTSC Standard)</SelectItem>
+                          <SelectItem value="Auto">Auto Detection</SelectItem>
+                          <SelectItem value="Smartphone">Smartphone Cam</SelectItem>
+                          <SelectItem value="DSLR">Professional DSLR</SelectItem>
+                          <SelectItem value="Cinema">Cinema Grade</SelectItem>
+                          <SelectItem value="Macro">Macro Detail</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Color Style */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] text-muted-foreground font-medium">Color Palette Style</Label>
+                    <Select
+                      value={settings.colorStyle || "Natural"}
+                      onValueChange={(val) => {
+                        setSettings((s) => ({ ...s, colorStyle: val as any }));
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Natural">Natural Palette</SelectItem>
+                        <SelectItem value="Vibrant">Vibrant & Pop</SelectItem>
+                        <SelectItem value="Muted">Muted Earthy</SelectItem>
+                        <SelectItem value="Filmic">Filmic Grading</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Style Strength */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-muted-foreground">Style Influence Strength</Label>
+                      <span className="font-mono text-[11px] text-foreground">{settings.styleStrength}%</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[settings.styleStrength ?? 50]}
+                      onValueChange={([val]) => setSettings((s) => ({ ...s, styleStrength: val }))}
+                    />
+                  </div>
+
+                  {/* Prompt Enhancement */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-muted-foreground">Prompt Enhancement Weight</Label>
+                      <span className="font-mono text-[11px] text-foreground">{settings.promptEnhancement}%</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[settings.promptEnhancement ?? 50]}
+                      onValueChange={([val]) => setSettings((s) => ({ ...s, promptEnhancement: val }))}
+                    />
+                  </div>
+
+                  {/* Creativity / Denoise influence */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-muted-foreground">Creativity Index</Label>
+                      <span className="font-mono text-[11px] text-foreground">{settings.creativity}%</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[settings.creativity ?? 50]}
+                      onValueChange={([val]) => setSettings((s) => ({ ...s, creativity: val }))}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Separator className="bg-border/60" />
+
+              {/* SECTION: Image Details & Realism */}
+              <Collapsible defaultOpen={false} className="space-y-2">
+                <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                  <span>Details & Realism</span>
+                  <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3.5 pt-1.5">
+                  {/* Detail Level */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-muted-foreground">Detail Level</Label>
+                      <span className="font-mono text-[11px] text-foreground">{settings.detailLevel}%</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[settings.detailLevel ?? 50]}
+                      onValueChange={([val]) => setSettings((s) => ({ ...s, detailLevel: val }))}
+                    />
+                  </div>
+
+                  {/* Face Detail */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-muted-foreground">Face Restoration / Detail</Label>
+                      <span className="font-mono text-[11px] text-foreground">{settings.faceDetail}%</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[settings.faceDetail ?? 50]}
+                      onValueChange={([val]) => setSettings((s) => ({ ...s, faceDetail: val }))}
+                    />
+                  </div>
+
+                  {/* Sharpness */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-muted-foreground">Sharpness & Focus</Label>
+                      <span className="font-mono text-[11px] text-foreground">{settings.sharpness}%</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[settings.sharpness ?? 50]}
+                      onValueChange={([val]) => setSettings((s) => ({ ...s, sharpness: val }))}
+                    />
+                  </div>
+
+                  {/* Realism */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <Label className="text-muted-foreground">Photographic Realism</Label>
+                      <span className="font-mono text-[11px] text-foreground">{settings.realism}%</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={[settings.realism ?? 50]}
+                      onValueChange={([val]) => setSettings((s) => ({ ...s, realism: val }))}
+                    />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              <Separator className="bg-border/60" />
+
+              {/* SECTION: Post-processing & Upscale */}
+              <Collapsible defaultOpen={false} className="space-y-2">
+                <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                  <span>Upscaling & Post-Process</span>
+                  <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3.5 pt-1.5">
+                  {/* Upscale Output Switch */}
+                  <div className="flex items-center justify-between p-2 rounded-lg border border-border/40 bg-card/15">
+                    <div className="space-y-0.5">
+                      <Label className="text-[11px] text-foreground font-medium">Upscale Output</Label>
+                      <p className="text-[9px] text-muted-foreground">Enables super-resolution output</p>
+                    </div>
+                    <Switch
+                      checked={settings.upscaleOutput === true}
+                      onCheckedChange={(checked) => {
+                        setSettings((s) => ({ ...s, upscaleOutput: checked }));
+                      }}
+                    />
+                  </div>
+
+                  {/* Upscale Factor */}
+                  {settings.upscaleOutput && (
+                    <div className="space-y-1.5 animate-in slide-in-from-top-1 duration-200">
+                      <Label className="text-[11px] text-muted-foreground font-medium">Upscale Scale Factor</Label>
+                      <Select
+                        value={settings.upscaleFactor || "2x"}
+                        onValueChange={(val) => {
+                          setSettings((s) => ({ ...s, upscaleFactor: val as any }));
+                        }}
+                      >
+                        <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1x">1x (Denoise & Refine)</SelectItem>
+                          <SelectItem value="2x">2x Standard Super-Res</SelectItem>
+                          <SelectItem value="4x">4x Ultra-Resolution</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

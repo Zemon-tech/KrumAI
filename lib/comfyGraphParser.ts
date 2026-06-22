@@ -10,6 +10,27 @@ export interface GenSettings {
   height: number;
   duration?: number; // video duration in seconds (default 5)
   fps?: number;      // video frames per second (default 25)
+
+  // User-Facing Parameters (Safe)
+  prompt?: string;
+  negativePrompt?: string;
+  qualityLevel?: "Draft" | "Standard" | "High" | "Ultra";
+  styleStrength?: number;
+  promptEnhancement?: number;
+  creativity?: number;
+  detailLevel?: number;
+  faceDetail?: number;
+  lightingStyle?: "Auto" | "Natural" | "Studio" | "Cinematic" | "Golden Hour" | "Dramatic";
+  cameraType?: "Auto" | "Smartphone" | "DSLR" | "Cinema" | "Macro";
+  aspectRatio?: "Auto" | "1:1" | "16:9" | "9:16" | "3:2" | "4:5";
+  resolution?: "Auto" | "HD" | "2K" | "4K";
+  colorStyle?: "Natural" | "Vibrant" | "Muted" | "Filmic";
+  sharpness?: number;
+  realism?: number;
+  upscaleOutput?: boolean;
+  upscaleFactor?: "1x" | "2x" | "4x";
+  turboMode?: boolean;
+  presetStyle?: string;
 }
 
 export function parseGraph(
@@ -82,6 +103,11 @@ export function parseGraph(
     if (graph["98_99"] && graph["98_99"].inputs) {
       graph["98_99"].inputs.value = Math.max(4, Math.floor(steps / 2)); // Turbo steps are usually lower
     }
+
+    // 6. Turbo Mode Toggle
+    if (graph["98_104"] && graph["98_104"].inputs) {
+      graph["98_104"].inputs.value = !!settings.turboMode;
+    }
   } else if (type === "i2i") {
     // Qwen Image Edit
     // 1. Base Image Filename
@@ -111,6 +137,11 @@ export function parseGraph(
     // 5. CFG / Guidance
     if (graph["170_154"] && graph["170_154"].inputs) {
       graph["170_154"].inputs.value = guidance;
+    }
+
+    // 6. Turbo Mode Toggle
+    if (graph["170_168"] && graph["170_168"].inputs) {
+      graph["170_168"].inputs.value = !!settings.turboMode;
     }
   } else if (type === "t2v" || type === "i2v") {
     // LTX Video T2V / I2V

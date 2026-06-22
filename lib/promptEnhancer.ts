@@ -2,6 +2,16 @@ import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
 
+const PRESET_STYLE_INJECTIONS: Record<string, string> = {
+  photorealistic: "Style: High-end commercial photography. Shot on Hasselblad X2D. 80mm lens. f/2.8 aperture. Natural realistic lighting. Authentic skin textures. Premium commercial photography. Shallow depth of field. Accurate colors.",
+  cinematic: "Style: Cinematic film still. Shot using anamorphic cinema lenses. Dramatic practical lighting. Volumetric atmosphere. Film-quality contrast. Natural lens characteristics. Visual storytelling.",
+  product: "Style: Premium luxury product photography. Professional studio lighting. Clean reflections. Perfect edge definition. Commercial advertising quality. Minimal distractions.",
+  social_media: "Style: Modern social media design. Strong visual hierarchy. Bold focal point. Clear communication. High engagement design. Professional layout.",
+  typography: "Style: Professional graphic design. Typography is the primary focus. All text must be perfectly spelled, fully readable, professionally typeset, well aligned, high contrast, visually balanced.",
+  editorial: "Style: Luxury editorial photography. Fashion magazine quality. Premium composition. Elegant posing. Sophisticated lighting. Luxury color grading.",
+  concept_art: "Style: AAA concept art. Large-scale visual design. Rich environmental storytelling. Epic composition. Advanced atmosphere. High-detail worldbuilding."
+};
+
 export interface GenSettings {
   type: string;
   model: string;
@@ -12,6 +22,27 @@ export interface GenSettings {
   duration?: number;
   fps?: number;
   llmProvider?: "openrouter" | "llamacpp";
+
+  // User-Facing Parameters (Safe)
+  prompt?: string;
+  negativePrompt?: string;
+  qualityLevel?: "Draft" | "Standard" | "High" | "Ultra";
+  styleStrength?: number;
+  promptEnhancement?: number;
+  creativity?: number;
+  detailLevel?: number;
+  faceDetail?: number;
+  lightingStyle?: "Auto" | "Natural" | "Studio" | "Cinematic" | "Golden Hour" | "Dramatic";
+  cameraType?: "Auto" | "Smartphone" | "DSLR" | "Cinema" | "Macro";
+  aspectRatio?: "Auto" | "1:1" | "16:9" | "9:16" | "3:2" | "4:5";
+  resolution?: "Auto" | "HD" | "2K" | "4K";
+  colorStyle?: "Natural" | "Vibrant" | "Muted" | "Filmic";
+  sharpness?: number;
+  realism?: number;
+  upscaleOutput?: boolean;
+  upscaleFactor?: "1x" | "2x" | "4x";
+  turboMode?: boolean;
+  presetStyle?: string;
 }
 
 export interface EnhancementResult {
@@ -69,6 +100,29 @@ Current Settings:
 - Width: ${settings.width}
 - Height: ${settings.height}
 - Model: ${settings.model}${settings.duration !== undefined ? `\n- Duration (seconds): ${settings.duration}` : ""}${settings.fps !== undefined ? `\n- FPS: ${settings.fps}` : ""}`;
+
+    if (settings.negativePrompt) userInstructions += `\n- Negative Prompt: ${settings.negativePrompt}`;
+    if (settings.qualityLevel) userInstructions += `\n- Quality Level: ${settings.qualityLevel}`;
+    if (settings.styleStrength !== undefined) userInstructions += `\n- Style Strength: ${settings.styleStrength}/100`;
+    if (settings.promptEnhancement !== undefined) userInstructions += `\n- Prompt Enhancement: ${settings.promptEnhancement}/100`;
+    if (settings.creativity !== undefined) userInstructions += `\n- Creativity: ${settings.creativity}/100`;
+    if (settings.detailLevel !== undefined) userInstructions += `\n- Detail Level: ${settings.detailLevel}/100`;
+    if (settings.faceDetail !== undefined) userInstructions += `\n- Face Detail: ${settings.faceDetail}/100`;
+    if (settings.lightingStyle) userInstructions += `\n- Lighting Style: ${settings.lightingStyle}`;
+    if (settings.cameraType) userInstructions += `\n- Camera Type: ${settings.cameraType}`;
+    if (settings.colorStyle) userInstructions += `\n- Color Style: ${settings.colorStyle}`;
+    if (settings.sharpness !== undefined) userInstructions += `\n- Sharpness: ${settings.sharpness}/100`;
+    if (settings.realism !== undefined) userInstructions += `\n- Realism: ${settings.realism}/100`;
+    if (settings.upscaleOutput !== undefined) userInstructions += `\n- Upscale Output: ${settings.upscaleOutput}`;
+    if (settings.upscaleFactor) userInstructions += `\n- Upscale Factor: ${settings.upscaleFactor}`;
+    if (settings.turboMode !== undefined) userInstructions += `\n- Turbo Mode: ${settings.turboMode}`;
+    if (settings.presetStyle && settings.presetStyle !== "none") {
+      const injection = PRESET_STYLE_INJECTIONS[settings.presetStyle];
+      if (injection) {
+        userInstructions += `\n- Selected Preset Style Name: ${settings.presetStyle.toUpperCase()}`;
+        userInstructions += `\n- Style Prompt Guidelines to inject: "${injection}"`;
+      }
+    }
 
     if (selectedAssetPrompt) {
       userInstructions += `\n\n---
