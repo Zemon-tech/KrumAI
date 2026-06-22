@@ -43,6 +43,28 @@ export interface GenSettings {
   upscaleFactor?: "1x" | "2x" | "4x";
   turboMode?: boolean;
   presetStyle?: string;
+  sampler?: string;
+
+  // Qwen Image Edit parameters
+  editType?: "auto" | "text_edit" | "object_add" | "object_remove" | "object_replace" | "background_change" | "style_transfer" | "face_edit" | "product_edit" | "poster_edit" | "logo_edit" | "rotation";
+  editStrength?: number;
+  preservationMode?: "strict" | "balanced" | "creative";
+  identityLock?: number;
+  facePreservation?: number;
+  backgroundLock?: number;
+  objectLock?: number;
+  sceneConsistency?: number;
+  textMode?: "auto" | "add" | "replace" | "remove" | "preserve";
+  typographyQuality?: "standard" | "high" | "maximum";
+  fontPreservation?: number;
+  textAccuracy?: number;
+  compositionLock?: number;
+  cameraStyle?: "auto" | "portrait" | "cinematic" | "studio" | "fashion" | "product" | "macro";
+  precisionMode?: "low" | "medium" | "high" | "pixel_perfect";
+  autoRefine?: boolean;
+  refinementPasses?: number;
+  style?: "auto" | "photorealistic" | "cinematic" | "editorial" | "product" | "luxury" | "anime" | "ghibli" | "watercolor" | "oil_painting" | "comic" | "3d_render" | "pixel_art";
+  outputQuality?: "standard" | "high" | "ultra";
 }
 
 export interface EnhancementResult {
@@ -122,6 +144,28 @@ Current Settings:
         userInstructions += `\n- Selected Preset Style Name: ${settings.presetStyle.toUpperCase()}`;
         userInstructions += `\n- Style Prompt Guidelines to inject: "${injection}"`;
       }
+    }
+
+    if (settings.type === "i2i") {
+      userInstructions += `\nQwen Image Edit Options:`;
+      if (settings.editType) userInstructions += `\n- Edit Type/Mode: ${settings.editType}`;
+      if (settings.editStrength !== undefined) userInstructions += `\n- Edit Strength: ${settings.editStrength}/100`;
+      if (settings.preservationMode) userInstructions += `\n- Preservation Mode: ${settings.preservationMode}`;
+      if (settings.identityLock !== undefined) userInstructions += `\n- Identity Lock: ${settings.identityLock}/100`;
+      if (settings.facePreservation !== undefined) userInstructions += `\n- Face Preservation: ${settings.facePreservation}/100`;
+      if (settings.backgroundLock !== undefined) userInstructions += `\n- Background Lock: ${settings.backgroundLock}/100`;
+      if (settings.objectLock !== undefined) userInstructions += `\n- Object Lock: ${settings.objectLock}/100`;
+      if (settings.sceneConsistency !== undefined) userInstructions += `\n- Scene Consistency: ${settings.sceneConsistency}/100`;
+      if (settings.compositionLock !== undefined) userInstructions += `\n- Composition Lock: ${settings.compositionLock}/100`;
+      if (settings.textMode) userInstructions += `\n- Text Mode: ${settings.textMode}`;
+      if (settings.typographyQuality) userInstructions += `\n- Typography Quality: ${settings.typographyQuality}`;
+      if (settings.fontPreservation !== undefined) userInstructions += `\n- Font Preservation: ${settings.fontPreservation}/100`;
+      if (settings.textAccuracy !== undefined) userInstructions += `\n- Text Accuracy: ${settings.textAccuracy}/100`;
+      if (settings.style) userInstructions += `\n- Style: ${settings.style}`;
+      if (settings.cameraStyle) userInstructions += `\n- Camera Style: ${settings.cameraStyle}`;
+      if (settings.precisionMode) userInstructions += `\n- Precision Mode: ${settings.precisionMode}`;
+      if (settings.autoRefine !== undefined) userInstructions += `\n- Auto Refine: ${settings.autoRefine}`;
+      if (settings.refinementPasses !== undefined) userInstructions += `\n- Refinement Passes: ${settings.refinementPasses}`;
     }
 
     if (selectedAssetPrompt) {

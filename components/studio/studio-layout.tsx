@@ -458,6 +458,12 @@ export function StudioLayout() {
     createdAt: new Date(),
   } : null);
 
+  // Compile list of available images for AiPanel
+  const availableImages = [
+    ...rootItems.filter((item) => item.type === "image"),
+    ...folders.flatMap((folder) => folder.items.filter((item) => item.type === "image")),
+  ];
+
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-background">
       {/* ── Top Bar ── */}
@@ -570,6 +576,8 @@ export function StudioLayout() {
                 selectedAsset={selectedAsset}
                 onGenerate={handleGenerate}
                 onClose={toggleRight}
+                availableAssets={availableImages}
+                onSelectAsset={handleSelect}
               />
             </div>
           </ResizablePanel>

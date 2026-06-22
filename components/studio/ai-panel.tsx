@@ -99,9 +99,31 @@ export interface GenSettings {
   upscaleFactor?: "1x" | "2x" | "4x";
   turboMode?: boolean;
   presetStyle?: string;
+  sampler?: string;
+
+  // Qwen Image Edit parameters
+  editType?: "auto" | "text_edit" | "object_add" | "object_remove" | "object_replace" | "background_change" | "style_transfer" | "face_edit" | "product_edit" | "poster_edit" | "logo_edit" | "rotation";
+  editStrength?: number;
+  preservationMode?: "strict" | "balanced" | "creative";
+  identityLock?: number;
+  facePreservation?: number;
+  backgroundLock?: number;
+  objectLock?: number;
+  sceneConsistency?: number;
+  textMode?: "auto" | "add" | "replace" | "remove" | "preserve";
+  typographyQuality?: "standard" | "high" | "maximum";
+  fontPreservation?: number;
+  textAccuracy?: number;
+  compositionLock?: number;
+  cameraStyle?: "auto" | "portrait" | "cinematic" | "studio" | "fashion" | "product" | "macro";
+  precisionMode?: "low" | "medium" | "high" | "pixel_perfect";
+  autoRefine?: boolean;
+  refinementPasses?: number;
+  style?: "auto" | "photorealistic" | "cinematic" | "editorial" | "product" | "luxury" | "anime" | "ghibli" | "watercolor" | "oil_painting" | "comic" | "3d_render" | "pixel_art";
+  outputQuality?: "standard" | "high" | "ultra";
 }
 
-export function calculateDimensions(type: GenType, aspectRatio: string, resolution: string) {
+export function calculateDimensions(type: GenType, aspectRatio: string, resolution: string, qualityLevel: string = "Standard") {
   const isVideo = type === "t2v" || type === "i2v";
   
   // Base maximum dimension
@@ -114,6 +136,17 @@ export function calculateDimensions(type: GenType, aspectRatio: string, resoluti
     maxDim = isVideo ? 1280 : 2048;
   } else if (resolution === "4K") {
     maxDim = isVideo ? 1920 : 3840;
+  }
+
+  // Apply Quality resolution multiplier (only for image generation)
+  if (!isVideo && type === "t2i") {
+    let multiplier = 1.0;
+    if (qualityLevel === "High") {
+      multiplier = 1.25;
+    } else if (qualityLevel === "Ultra") {
+      multiplier = 1.5;
+    }
+    maxDim = Math.round(maxDim * multiplier);
   }
 
   // Calculate dimensions based on aspect ratio
@@ -144,6 +177,7 @@ export interface StylePreset {
     detailLevel?: number;
     realism?: number;
     textQuality?: number;
+    sampler?: string;
   };
 }
 
@@ -164,7 +198,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       steps: 28,
       guidance: 3.5,
       detailLevel: 85,
-      realism: 100
+      realism: 100,
+      sampler: "dpmpp_2m"
     }
   },
   {
@@ -176,7 +211,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       steps: 30,
       guidance: 4.0,
       detailLevel: 90,
-      realism: 90
+      realism: 90,
+      sampler: "dpmpp_sde"
     }
   },
   {
@@ -188,7 +224,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       steps: 32,
       guidance: 4.5,
       detailLevel: 100,
-      realism: 95
+      realism: 95,
+      sampler: "dpmpp_2m"
     }
   },
   {
@@ -200,7 +237,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       steps: 24,
       guidance: 4.0,
       detailLevel: 80,
-      realism: 75
+      realism: 75,
+      sampler: "euler"
     }
   },
   {
@@ -211,7 +249,8 @@ export const STYLE_PRESETS: StylePreset[] = [
     parameters: {
       steps: 32,
       guidance: 5.0,
-      detailLevel: 95
+      detailLevel: 95,
+      sampler: "dpmpp_2m"
     }
   },
   {
@@ -223,7 +262,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       steps: 30,
       guidance: 4.0,
       detailLevel: 95,
-      realism: 90
+      realism: 90,
+      sampler: "dpmpp_sde"
     }
   },
   {
@@ -235,7 +275,8 @@ export const STYLE_PRESETS: StylePreset[] = [
       steps: 35,
       guidance: 4.5,
       detailLevel: 100,
-      realism: 70
+      realism: 70,
+      sampler: "dpmpp_sde"
     }
   }
 ];
@@ -292,6 +333,20 @@ export function assembleFluxPrompt(promptText: string, settings: GenSettings): s
     }
   }
 
+  // Detailing & Realism Sliders mapping
+  if (settings.detailLevel !== undefined && settings.detailLevel > 60) {
+    parts.push(`High detail rendering, rich textures, fine structures.`);
+  }
+  if (settings.realism !== undefined && settings.realism > 60) {
+    parts.push(`Photorealistic fidelity, highly lifelike details.`);
+  }
+  if (settings.sharpness !== undefined && settings.sharpness > 60) {
+    parts.push(`Crisp sharpness, sharp focus on subject.`);
+  }
+  if (settings.faceDetail !== undefined && settings.faceDetail > 60) {
+    parts.push(`High-definition facial features, detailed skin texture.`);
+  }
+
   // Global Quality Injection
   parts.push(
     "Professional composition.\nRealistic lighting and shadows.\nPhysically accurate materials.\nClean depth separation.\nPremium color grading.\nStrong visual hierarchy.\nHigh clarity.\nNatural texture detail.\nCommercial production quality."
@@ -344,9 +399,11 @@ interface AiPanelProps {
   selectedAsset?: AssetItem | null;
   onGenerate: (prompt: string, settings: GenSettings) => void;
   onClose?: () => void;
+  availableAssets?: AssetItem[];
+  onSelectAsset?: (id: string) => void;
 }
 
-export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPanelProps) {
+export function AiPanel({ generation, selectedAsset, onGenerate, onClose, availableAssets = [], onSelectAsset }: AiPanelProps) {
   const [activeTab, setActiveTab] = useState<"chat" | "settings">("chat");
   const [settings, setSettings] = useState<GenSettings>({
     type: "t2i",
@@ -375,6 +432,27 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
     upscaleFactor: "2x",
     turboMode: true,
     presetStyle: "none",
+
+    // Qwen Image Edit defaults
+    editType: "auto",
+    editStrength: 50,
+    preservationMode: "balanced",
+    identityLock: 80,
+    facePreservation: 80,
+    backgroundLock: 70,
+    objectLock: 70,
+    sceneConsistency: 90,
+    textMode: "auto",
+    typographyQuality: "maximum",
+    fontPreservation: 90,
+    textAccuracy: 100,
+    compositionLock: 80,
+    cameraStyle: "auto",
+    precisionMode: "high",
+    autoRefine: true,
+    refinementPasses: 2,
+    style: "auto",
+    outputQuality: "high",
   });
 
   const [directPrompt, setDirectPrompt] = useState("");
@@ -867,6 +945,80 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
                   </Button>
                 </div>
               )}
+
+              {/* SECTION: Source Image Selector */}
+              {(settings.type === "i2i" || settings.type === "i2v") && (
+                <>
+                  <Separator className="bg-border/60" />
+                  <Collapsible defaultOpen className="space-y-2 animate-in fade-in duration-200">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Source Image Selection</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3 pt-1.5">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Select Image to Edit</Label>
+                        <Select
+                          value={selectedAsset?.id || ""}
+                          onValueChange={(val) => {
+                            if (onSelectAsset) {
+                              onSelectAsset(val);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-9 text-xs bg-background/50 border-border/60">
+                            <SelectValue placeholder="Choose from library..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableAssets && availableAssets.length > 0 ? (
+                              availableAssets.map((asset) => (
+                                <SelectItem key={asset.id} value={asset.id}>
+                                  <div className="flex items-center gap-2 py-0.5">
+                                    {asset.url && (
+                                      <img
+                                        src={asset.url}
+                                        alt={asset.name}
+                                        className="size-5 rounded object-cover border border-border/60"
+                                      />
+                                    )}
+                                    <span className="font-semibold text-[11px] truncate max-w-[150px]">{asset.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="none" disabled>
+                                No source images in Workspace
+                              </SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Display Selected Image Preview Card */}
+                      {selectedAsset ? (
+                        <div className="flex items-center gap-2.5 p-2 rounded-lg border border-primary/20 bg-primary/5">
+                          {selectedAsset.url && (
+                            <img
+                              src={selectedAsset.url}
+                              alt={selectedAsset.name}
+                              className="size-10 rounded object-cover border border-primary/30"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] font-semibold text-foreground truncate">{selectedAsset.name}</div>
+                            <div className="text-[9px] text-muted-foreground truncate">{selectedAsset.model || "Imported"}</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 text-center text-[10px] text-destructive border border-destructive/20 bg-destructive/5 rounded-lg">
+                          ⚠️ No source image selected. Select one to enable editing.
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
+
               {settings.type === "t2i" && (
                 <>
                   <Separator className="bg-border/60" />
@@ -897,6 +1049,9 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
                                 }
                                 if (preset.parameters.realism !== undefined) {
                                   nextSettings.realism = preset.parameters.realism;
+                                }
+                                if (preset.parameters.sampler !== undefined) {
+                                  nextSettings.sampler = preset.parameters.sampler;
                                 }
                                 return nextSettings;
                               });
@@ -1083,7 +1238,32 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
                     <Select
                       value={settings.qualityLevel || "Standard"}
                       onValueChange={(val) => {
-                        setSettings((s) => ({ ...s, qualityLevel: val as any }));
+                        setSettings((s) => {
+                          if (s.type === "i2i") {
+                            const qwenMap = {
+                              Draft: { steps: 10, guidance: 2, autoRefine: false, refinementPasses: 2 },
+                              Standard: { steps: 20, guidance: 3, autoRefine: true, refinementPasses: 2 },
+                              High: { steps: 30, guidance: 4, autoRefine: true, refinementPasses: 2 },
+                              Ultra: { steps: 40, guidance: 4, autoRefine: true, refinementPasses: 3 },
+                            };
+                            const params = qwenMap[val as keyof typeof qwenMap] || {};
+                            return {
+                              ...s,
+                              qualityLevel: val as any,
+                              ...params,
+                            };
+                          }
+                          const stepsMap = { Draft: 16, Standard: 24, High: 30, Ultra: 36 };
+                          const nextSteps = stepsMap[val as keyof typeof stepsMap] || s.steps;
+                          const { width, height } = calculateDimensions(s.type, s.aspectRatio || "Auto", s.resolution || "Auto", val);
+                          return {
+                            ...s,
+                            qualityLevel: val as any,
+                            steps: nextSteps,
+                            width,
+                            height,
+                          };
+                        });
                       }}
                     >
                       <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
@@ -1144,200 +1324,678 @@ export function AiPanel({ generation, selectedAsset, onGenerate, onClose }: AiPa
                 </CollapsibleContent>
               </Collapsible>
 
-              <Separator className="bg-border/60" />
+              {settings.type !== "i2i" && (
+                <>
+                  <Separator className="bg-border/60" />
 
-              {/* SECTION: Aesthetic & Camera Styles */}
-              <Collapsible defaultOpen={false} className="space-y-2">
-                <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
-                  <span>Aesthetics & Style</span>
-                  <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3.5 pt-1.5">
-                  {/* Lighting Style */}
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground font-medium">Lighting Style</Label>
-                    <Select
-                      value={settings.lightingStyle || "Auto"}
-                      onValueChange={(val) => {
-                        setSettings((s) => ({ ...s, lightingStyle: val as any }));
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Auto">Auto Lighting</SelectItem>
-                        <SelectItem value="Natural">Natural Light</SelectItem>
-                        <SelectItem value="Studio">Studio Portra</SelectItem>
-                        <SelectItem value="Cinematic">Cinematic Mood</SelectItem>
-                        <SelectItem value="Golden Hour">Golden Hour Glow</SelectItem>
-                        <SelectItem value="Dramatic">Dramatic Contrast</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* SECTION: Aesthetic & Camera Styles */}
+                  <Collapsible defaultOpen={false} className="space-y-2">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Aesthetics & Style</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3.5 pt-1.5">
+                      {/* Lighting Style */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Lighting Style</Label>
+                        <Select
+                          value={settings.lightingStyle || "Auto"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, lightingStyle: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Auto">Auto Lighting</SelectItem>
+                            <SelectItem value="Natural">Natural Light</SelectItem>
+                            <SelectItem value="Studio">Studio Portra</SelectItem>
+                            <SelectItem value="Cinematic">Cinematic Mood</SelectItem>
+                            <SelectItem value="Golden Hour">Golden Hour Glow</SelectItem>
+                            <SelectItem value="Dramatic">Dramatic Contrast</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                  {/* Camera Type */}
-                  {settings.type !== "i2i" && (
-                    <div className="space-y-1.5">
-                      <Label className="text-[11px] text-muted-foreground font-medium">Camera Lens Type</Label>
-                      <Select
-                        value={settings.cameraType || "Auto"}
-                        onValueChange={(val) => {
-                          setSettings((s) => ({ ...s, cameraType: val as any }));
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Auto">Auto Detection</SelectItem>
-                          <SelectItem value="Smartphone">Smartphone Cam</SelectItem>
-                          <SelectItem value="DSLR">Professional DSLR</SelectItem>
-                          <SelectItem value="Cinema">Cinema Grade</SelectItem>
-                          <SelectItem value="Macro">Macro Detail</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                      {/* Camera Type */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Camera Lens Type</Label>
+                        <Select
+                          value={settings.cameraType || "Auto"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, cameraType: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Auto">Auto Detection</SelectItem>
+                            <SelectItem value="Smartphone">Smartphone Cam</SelectItem>
+                            <SelectItem value="DSLR">Professional DSLR</SelectItem>
+                            <SelectItem value="Cinema">Cinema Grade</SelectItem>
+                            <SelectItem value="Macro">Macro Detail</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                  {/* Color Style */}
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] text-muted-foreground font-medium">Color Palette Style</Label>
-                    <Select
-                      value={settings.colorStyle || "Natural"}
-                      onValueChange={(val) => {
-                        setSettings((s) => ({ ...s, colorStyle: val as any }));
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Natural">Natural Palette</SelectItem>
-                        <SelectItem value="Vibrant">Vibrant & Pop</SelectItem>
-                        <SelectItem value="Muted">Muted Earthy</SelectItem>
-                        <SelectItem value="Filmic">Filmic Grading</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      {/* Color Style */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Color Palette Style</Label>
+                        <Select
+                          value={settings.colorStyle || "Natural"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, colorStyle: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Natural">Natural Palette</SelectItem>
+                            <SelectItem value="Vibrant">Vibrant & Pop</SelectItem>
+                            <SelectItem value="Muted">Muted Earthy</SelectItem>
+                            <SelectItem value="Filmic">Filmic Grading</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
-                  {/* Style Strength */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <Label className="text-muted-foreground">Style Influence Strength</Label>
-                      <span className="font-mono text-[11px] text-foreground">{settings.styleStrength}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[settings.styleStrength ?? 50]}
-                      onValueChange={([val]) => setSettings((s) => ({ ...s, styleStrength: val }))}
-                    />
-                  </div>
+                      {/* Style Strength */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Style Influence Strength</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.styleStrength}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.styleStrength ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, styleStrength: val }))}
+                        />
+                      </div>
 
-                  {/* Prompt Enhancement */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <Label className="text-muted-foreground">Prompt Enhancement Weight</Label>
-                      <span className="font-mono text-[11px] text-foreground">{settings.promptEnhancement}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[settings.promptEnhancement ?? 50]}
-                      onValueChange={([val]) => setSettings((s) => ({ ...s, promptEnhancement: val }))}
-                    />
-                  </div>
+                      {/* Prompt Enhancement */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Prompt Enhancement Weight</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.promptEnhancement}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.promptEnhancement ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, promptEnhancement: val }))}
+                        />
+                      </div>
 
-                  {/* Creativity / Denoise influence */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <Label className="text-muted-foreground">Creativity Index</Label>
-                      <span className="font-mono text-[11px] text-foreground">{settings.creativity}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[settings.creativity ?? 50]}
-                      onValueChange={([val]) => setSettings((s) => ({ ...s, creativity: val }))}
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+                      {/* Creativity / Denoise influence */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Creativity Index</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.creativity}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.creativity ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, creativity: val }))}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
-              <Separator className="bg-border/60" />
+                  <Separator className="bg-border/60" />
 
-              {/* SECTION: Image Details & Realism */}
-              <Collapsible defaultOpen={false} className="space-y-2">
-                <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
-                  <span>Details & Realism</span>
-                  <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3.5 pt-1.5">
-                  {/* Detail Level */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <Label className="text-muted-foreground">Detail Level</Label>
-                      <span className="font-mono text-[11px] text-foreground">{settings.detailLevel}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[settings.detailLevel ?? 50]}
-                      onValueChange={([val]) => setSettings((s) => ({ ...s, detailLevel: val }))}
-                    />
-                  </div>
+                  {/* SECTION: Image Details & Realism */}
+                  <Collapsible defaultOpen={false} className="space-y-2">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Details & Realism</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3.5 pt-1.5">
+                      {/* Detail Level */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Detail Level</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.detailLevel}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.detailLevel ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, detailLevel: val }))}
+                        />
+                      </div>
 
-                  {/* Face Detail */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <Label className="text-muted-foreground">Face Restoration / Detail</Label>
-                      <span className="font-mono text-[11px] text-foreground">{settings.faceDetail}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[settings.faceDetail ?? 50]}
-                      onValueChange={([val]) => setSettings((s) => ({ ...s, faceDetail: val }))}
-                    />
-                  </div>
+                      {/* Face Detail */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Face Restoration / Detail</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.faceDetail}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.faceDetail ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, faceDetail: val }))}
+                        />
+                      </div>
 
-                  {/* Sharpness */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <Label className="text-muted-foreground">Sharpness & Focus</Label>
-                      <span className="font-mono text-[11px] text-foreground">{settings.sharpness}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[settings.sharpness ?? 50]}
-                      onValueChange={([val]) => setSettings((s) => ({ ...s, sharpness: val }))}
-                    />
-                  </div>
+                      {/* Sharpness */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Sharpness & Focus</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.sharpness}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.sharpness ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, sharpness: val }))}
+                        />
+                      </div>
 
-                  {/* Realism */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <Label className="text-muted-foreground">Photographic Realism</Label>
-                      <span className="font-mono text-[11px] text-foreground">{settings.realism}%</span>
-                    </div>
-                    <Slider
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={[settings.realism ?? 50]}
-                      onValueChange={([val]) => setSettings((s) => ({ ...s, realism: val }))}
-                    />
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
+                      {/* Realism */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Photographic Realism</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.realism}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.realism ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, realism: val }))}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
+
+              {settings.type === "i2i" && (
+                <>
+                  <Separator className="bg-border/60" />
+
+                  {/* QWEN SECTION: Edit Controls */}
+                  <Collapsible defaultOpen className="space-y-2">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Edit Controls</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3.5 pt-1.5">
+                      {/* Edit Type */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Edit Type / Mode</Label>
+                        <Select
+                          value={settings.editType || "auto"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, editType: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">Auto (Detect)</SelectItem>
+                            <SelectItem value="text_edit">Text Edit</SelectItem>
+                            <SelectItem value="object_add">Add Object</SelectItem>
+                            <SelectItem value="object_remove">Remove Object</SelectItem>
+                            <SelectItem value="object_replace">Replace Object</SelectItem>
+                            <SelectItem value="background_change">Change Background</SelectItem>
+                            <SelectItem value="style_transfer">Style Transfer</SelectItem>
+                            <SelectItem value="face_edit">Face Edit</SelectItem>
+                            <SelectItem value="product_edit">Product Edit</SelectItem>
+                            <SelectItem value="poster_edit">Poster Edit</SelectItem>
+                            <SelectItem value="logo_edit">Logo Edit</SelectItem>
+                            <SelectItem value="rotation">3D Rotation</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Edit Strength */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground font-medium">Edit Strength</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.editStrength}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.editStrength ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, editStrength: val }))}
+                        />
+                      </div>
+
+                      {/* Preservation Mode */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Preservation Mode</Label>
+                        <Select
+                          value={settings.preservationMode || "balanced"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, preservationMode: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="strict">Strict (Keep Original)</SelectItem>
+                            <SelectItem value="balanced">Balanced (Recommended)</SelectItem>
+                            <SelectItem value="creative">Creative (More Freedom)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator className="bg-border/60" />
+
+                  {/* QWEN SECTION: Preservation Locks */}
+                  <Collapsible defaultOpen={false} className="space-y-2">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Preservation Locks</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3.5 pt-1.5">
+                      {/* Identity Lock */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Identity Lock</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.identityLock}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.identityLock ?? 80]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, identityLock: val }))}
+                        />
+                      </div>
+
+                      {/* Face Preservation */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Face Preservation</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.facePreservation}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.facePreservation ?? 80]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, facePreservation: val }))}
+                        />
+                      </div>
+
+                      {/* Background Lock */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Background Lock</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.backgroundLock}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.backgroundLock ?? 70]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, backgroundLock: val }))}
+                        />
+                      </div>
+
+                      {/* Object Lock */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Object Lock</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.objectLock}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.objectLock ?? 70]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, objectLock: val }))}
+                        />
+                      </div>
+
+                      {/* Scene Consistency */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Scene Consistency</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.sceneConsistency}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.sceneConsistency ?? 90]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, sceneConsistency: val }))}
+                        />
+                      </div>
+
+                      {/* Composition Lock */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Composition Lock</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.compositionLock}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.compositionLock ?? 80]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, compositionLock: val }))}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator className="bg-border/60" />
+
+                  {/* QWEN SECTION: Typography Controls */}
+                  <Collapsible defaultOpen={false} className="space-y-2">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Typography Controls</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3.5 pt-1.5">
+                      {/* Text Mode */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Text Edit Mode</Label>
+                        <Select
+                          value={settings.textMode || "auto"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, textMode: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">Auto</SelectItem>
+                            <SelectItem value="add">Add Text</SelectItem>
+                            <SelectItem value="replace">Replace Text</SelectItem>
+                            <SelectItem value="remove">Remove Text</SelectItem>
+                            <SelectItem value="preserve">Preserve Original Text</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Typography Quality */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Typography Quality</Label>
+                        <Select
+                          value={settings.typographyQuality || "maximum"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, typographyQuality: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="standard">Standard</SelectItem>
+                            <SelectItem value="high">High Quality</SelectItem>
+                            <SelectItem value="maximum">Maximum Precision</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Font Preservation */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Font Style Preservation</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.fontPreservation}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.fontPreservation ?? 90]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, fontPreservation: val }))}
+                        />
+                      </div>
+
+                      {/* Text Accuracy */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Text Accuracy</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.textAccuracy}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.textAccuracy ?? 100]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, textAccuracy: val }))}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator className="bg-border/60" />
+
+                  {/* QWEN SECTION: Aesthetics & Style */}
+                  <Collapsible defaultOpen={false} className="space-y-2">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Aesthetics & Style</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3.5 pt-1.5">
+                      {/* Style */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Selected Style</Label>
+                        <Select
+                          value={settings.style || "auto"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, style: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">Auto Style</SelectItem>
+                            <SelectItem value="photorealistic">Photorealistic</SelectItem>
+                            <SelectItem value="cinematic">Cinematic</SelectItem>
+                            <SelectItem value="editorial">Editorial Photography</SelectItem>
+                            <SelectItem value="product">Product Photography</SelectItem>
+                            <SelectItem value="luxury">Luxury / Fine Art</SelectItem>
+                            <SelectItem value="anime">Anime / Manga</SelectItem>
+                            <SelectItem value="ghibli">Ghibli Style</SelectItem>
+                            <SelectItem value="watercolor">Watercolor</SelectItem>
+                            <SelectItem value="oil_painting">Oil Painting</SelectItem>
+                            <SelectItem value="comic">Comic Book</SelectItem>
+                            <SelectItem value="3d_render">3D Render</SelectItem>
+                            <SelectItem value="pixel_art">Pixel Art</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Style Strength */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Style Strength</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.styleStrength}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.styleStrength ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, styleStrength: val }))}
+                        />
+                      </div>
+
+                      {/* Realism */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Realism Level</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.realism}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.realism ?? 80]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, realism: val }))}
+                        />
+                      </div>
+
+                      {/* Creativity */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Creativity Level</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.creativity}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.creativity ?? 50]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, creativity: val }))}
+                        />
+                      </div>
+
+                      {/* Detail Level */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <Label className="text-muted-foreground">Detail Level</Label>
+                          <span className="font-mono text-[11px] text-foreground">{settings.detailLevel}%</span>
+                        </div>
+                        <Slider
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={[settings.detailLevel ?? 80]}
+                          onValueChange={([val]) => setSettings((s) => ({ ...s, detailLevel: val }))}
+                        />
+                      </div>
+
+                      {/* Camera Style */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Camera Style</Label>
+                        <Select
+                          value={settings.cameraStyle || "auto"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, cameraStyle: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">Auto Camera</SelectItem>
+                            <SelectItem value="portrait">Portrait Close-up</SelectItem>
+                            <SelectItem value="cinematic">Cinematic Wide</SelectItem>
+                            <SelectItem value="studio">Studio Lighting Focal</SelectItem>
+                            <SelectItem value="fashion">Fashion Editorial</SelectItem>
+                            <SelectItem value="product">Product Macro</SelectItem>
+                            <SelectItem value="macro">Extreme Macro</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Lighting Style */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Lighting Style</Label>
+                        <Select
+                          value={settings.lightingStyle || "Auto"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, lightingStyle: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Auto">Auto Lighting</SelectItem>
+                            <SelectItem value="Natural">Natural Diffused</SelectItem>
+                            <SelectItem value="soft">Soft Softbox</SelectItem>
+                            <SelectItem value="hard">Hard Contrast / Spotlight</SelectItem>
+                            <SelectItem value="studio">Studio Three-Point</SelectItem>
+                            <SelectItem value="golden_hour">Golden Hour Glow</SelectItem>
+                            <SelectItem value="dramatic">Dramatic Chiaroscuro</SelectItem>
+                            <SelectItem value="cinematic">Cinematic Practical</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
+                  <Separator className="bg-border/60" />
+
+                  {/* QWEN SECTION: Precision & Refinement */}
+                  <Collapsible defaultOpen className="space-y-2">
+                    <CollapsibleTrigger className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider w-full hover:text-foreground">
+                      <span>Precision & Refinement</span>
+                      <ChevronRightIcon className="size-3.5 transition-transform data-[state=open]:rotate-90" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-3.5 pt-1.5">
+                      {/* Precision */}
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] text-muted-foreground font-medium">Localization Precision</Label>
+                        <Select
+                          value={settings.precisionMode || "high"}
+                          onValueChange={(val) => {
+                            setSettings((s) => ({ ...s, precisionMode: val as any }));
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-background/50 border-border/60">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Low Precision (Faster)</SelectItem>
+                            <SelectItem value="medium">Medium Precision</SelectItem>
+                            <SelectItem value="high">High Precision</SelectItem>
+                            <SelectItem value="pixel_perfect">Pixel Perfect Alignment</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Auto Refine */}
+                      <div className="flex items-center justify-between p-2 rounded-lg border border-border/40 bg-card/15">
+                        <div className="space-y-0.5">
+                          <Label className="text-[11px] text-foreground font-medium">Auto Refine Passes</Label>
+                          <p className="text-[9px] text-muted-foreground">Applies automatic detailing passes</p>
+                        </div>
+                        <Switch
+                          checked={settings.autoRefine !== false}
+                          onCheckedChange={(checked) => {
+                            setSettings((s) => ({ ...s, autoRefine: checked }));
+                          }}
+                        />
+                      </div>
+
+                      {/* Refinement Passes */}
+                      {settings.autoRefine !== false && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <Label className="text-muted-foreground">Refinement Passes</Label>
+                            <span className="font-mono text-[11px] text-foreground">{settings.refinementPasses ?? 2}</span>
+                          </div>
+                          <Slider
+                            min={1}
+                            max={5}
+                            step={1}
+                            value={[settings.refinementPasses ?? 2]}
+                            onValueChange={([val]) => setSettings((s) => ({ ...s, refinementPasses: val }))}
+                          />
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
 
               <Separator className="bg-border/60" />
 

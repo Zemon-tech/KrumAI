@@ -36,6 +36,7 @@
     "class_type": "FluxKontextMultiReferenceLatentMethod",
     "inputs": {
       "method": "index_timestep_zero",
+      "reference_latents_method": "index_timestep_zero",
       "conditioning": [
         "170_149",
         0
@@ -46,6 +47,7 @@
     "class_type": "FluxKontextMultiReferenceLatentMethod",
     "inputs": {
       "method": "index_timestep_zero",
+      "reference_latents_method": "index_timestep_zero",
       "conditioning": [
         "170_151",
         0

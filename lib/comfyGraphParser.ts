@@ -31,6 +31,28 @@ export interface GenSettings {
   upscaleFactor?: "1x" | "2x" | "4x";
   turboMode?: boolean;
   presetStyle?: string;
+  sampler?: string;
+
+  // Qwen Image Edit parameters
+  editType?: "auto" | "text_edit" | "object_add" | "object_remove" | "object_replace" | "background_change" | "style_transfer" | "face_edit" | "product_edit" | "poster_edit" | "logo_edit" | "rotation";
+  editStrength?: number;
+  preservationMode?: "strict" | "balanced" | "creative";
+  identityLock?: number;
+  facePreservation?: number;
+  backgroundLock?: number;
+  objectLock?: number;
+  sceneConsistency?: number;
+  textMode?: "auto" | "add" | "replace" | "remove" | "preserve";
+  typographyQuality?: "standard" | "high" | "maximum";
+  fontPreservation?: number;
+  textAccuracy?: number;
+  compositionLock?: number;
+  cameraStyle?: "auto" | "portrait" | "cinematic" | "studio" | "fashion" | "product" | "macro";
+  precisionMode?: "low" | "medium" | "high" | "pixel_perfect";
+  autoRefine?: boolean;
+  refinementPasses?: number;
+  style?: "auto" | "photorealistic" | "cinematic" | "editorial" | "product" | "luxury" | "anime" | "ghibli" | "watercolor" | "oil_painting" | "comic" | "3d_render" | "pixel_art";
+  outputQuality?: "standard" | "high" | "ultra";
 }
 
 export function parseGraph(
@@ -108,6 +130,11 @@ export function parseGraph(
     if (graph["98_104"] && graph["98_104"].inputs) {
       graph["98_104"].inputs.value = !!settings.turboMode;
     }
+
+    // 7. Sampler
+    if (settings.sampler && graph["98_16"] && graph["98_16"].inputs) {
+      graph["98_16"].inputs.sampler_name = settings.sampler;
+    }
   } else if (type === "i2i") {
     // Qwen Image Edit
     // 1. Base Image Filename
@@ -127,21 +154,36 @@ export function parseGraph(
     }
 
     // 4. Steps
+    let resolvedSteps = steps;
+    if (settings.qualityLevel) {
+      const qwenQualitySteps = { Draft: 10, Standard: 20, High: 30, Ultra: 40 };
+      resolvedSteps = qwenQualitySteps[settings.qualityLevel] || steps;
+    }
     if (graph["170_166"] && graph["170_166"].inputs) {
-      graph["170_166"].inputs.value = steps;
+      graph["170_166"].inputs.value = resolvedSteps;
     }
     if (graph["170_165"] && graph["170_165"].inputs) {
-      graph["170_165"].inputs.value = Math.max(4, Math.floor(steps / 10)); // Turbo steps are very low (e.g. 4)
+      graph["170_165"].inputs.value = Math.max(4, Math.floor(resolvedSteps / 10)); // Turbo steps are very low (e.g. 4)
     }
 
     // 5. CFG / Guidance
+    let resolvedGuidance = guidance;
+    if (settings.qualityLevel) {
+      const qwenQualityCFG = { Draft: 2, Standard: 3, High: 4, Ultra: 4 };
+      resolvedGuidance = qwenQualityCFG[settings.qualityLevel] || guidance;
+    }
     if (graph["170_154"] && graph["170_154"].inputs) {
-      graph["170_154"].inputs.value = guidance;
+      graph["170_154"].inputs.value = resolvedGuidance;
     }
 
     // 6. Turbo Mode Toggle
     if (graph["170_168"] && graph["170_168"].inputs) {
       graph["170_168"].inputs.value = !!settings.turboMode;
+    }
+
+    // 7. Sampler
+    if (settings.sampler && graph["170_169"] && graph["170_169"].inputs) {
+      graph["170_169"].inputs.sampler_name = settings.sampler;
     }
   } else if (type === "t2v" || type === "i2v") {
     // LTX Video T2V / I2V
