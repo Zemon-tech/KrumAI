@@ -1,0 +1,365 @@
+{
+  "1": {
+    "inputs": {
+      "image": "style_reference.png"
+    },
+    "class_type": "LoadImageS3",
+    "_meta": {
+      "title": "STYLE Reference Image (S3)"
+    }
+  },
+  "2": {
+    "inputs": {
+      "image": "content_reference.png"
+    },
+    "class_type": "LoadImageS3",
+    "_meta": {
+      "title": "CONTENT / Subject Image (S3)"
+    }
+  },
+  "40": {
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNET (Qwen-Image-Edit)"
+    }
+  },
+  "41": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP (Qwen)"
+    }
+  },
+  "42": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE (Qwen)"
+    }
+  },
+  "43": {
+    "inputs": {
+      "shift": 3.1,
+      "model": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "44": {
+    "inputs": {
+      "strength": 1,
+      "pre_cfg": false,
+      "model": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "CFGNorm",
+    "_meta": {
+      "title": "CFGNorm"
+    }
+  },
+  "45": {
+    "inputs": {
+      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "44",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "4-Step Lightning LoRA"
+    }
+  },
+  "46": {
+    "inputs": {
+      "value": true
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Enable 4-Step Lightning LoRA?"
+    }
+  },
+  "47": {
+    "inputs": {
+      "switch": [
+        "46",
+        0
+      ],
+      "on_false": [
+        "44",
+        0
+      ],
+      "on_true": [
+        "45",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (Model)"
+    }
+  },
+  "48": {
+    "inputs": {
+      "image": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "FluxKontextImageScale",
+    "_meta": {
+      "title": "Scale Content Image"
+    }
+  },
+  "49": {
+    "inputs": {
+      "prompt": "",
+      "clip": [
+        "41",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ],
+      "image1": [
+        "48",
+        0
+      ],
+      "image2": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus (Negative - leave blank)"
+    }
+  },
+  "50": {
+    "inputs": {
+      "prompt": "image1 is the content/subject. image2 is the style reference. Repaint image1 using the visual style of image2 (lighting, color grading, rendering medium, mood) while keeping image1's composition, subject identity, and pose unchanged.",
+      "clip": [
+        "41",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ],
+      "image1": [
+        "48",
+        0
+      ],
+      "image2": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus (Positive - style transfer instruction)"
+    }
+  },
+  "51": {
+    "inputs": {
+      "reference_latents_method": "index_timestep_zero",
+      "conditioning": [
+        "49",
+        0
+      ]
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Multi-Ref Method (Negative)"
+    }
+  },
+  "52": {
+    "inputs": {
+      "reference_latents_method": "index_timestep_zero",
+      "conditioning": [
+        "50",
+        0
+      ]
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Multi-Ref Method (Positive)"
+    }
+  },
+  "53": {
+    "inputs": {
+      "pixels": [
+        "48",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "54": {
+    "inputs": {
+      "value": 1
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "CFG (lightning)"
+    }
+  },
+  "55": {
+    "inputs": {
+      "value": 4
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "CFG (normal)"
+    }
+  },
+  "56": {
+    "inputs": {
+      "switch": [
+        "46",
+        0
+      ],
+      "on_false": [
+        "55",
+        0
+      ],
+      "on_true": [
+        "54",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (CFG)"
+    }
+  },
+  "57": {
+    "inputs": {
+      "value": 4
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Steps (lightning)"
+    }
+  },
+  "58": {
+    "inputs": {
+      "value": 40
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Steps (normal)"
+    }
+  },
+  "59": {
+    "inputs": {
+      "switch": [
+        "46",
+        0
+      ],
+      "on_false": [
+        "58",
+        0
+      ],
+      "on_true": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (Steps)"
+    }
+  },
+  "60": {
+    "inputs": {
+      "seed": 318693523635328,
+      "steps": [
+        "59",
+        0
+      ],
+      "cfg": [
+        "56",
+        0
+      ],
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "47",
+        0
+      ],
+      "positive": [
+        "52",
+        0
+      ],
+      "negative": [
+        "51",
+        0
+      ],
+      "latent_image": [
+        "53",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "61": {
+    "inputs": {
+      "samples": [
+        "60",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "62": {
+    "inputs": {
+      "filename_prefix": "StyleTransfer_Qwen",
+      "images": [
+        "61",
+        0
+      ]
+    },
+    "class_type": "SaveImageS3",
+    "_meta": {
+      "title": "Save - Style-Transferred Image to S3"
+    }
+  }
+}

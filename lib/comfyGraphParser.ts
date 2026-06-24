@@ -55,6 +55,141 @@ export interface GenSettings {
   outputQuality?: "standard" | "high" | "ultra";
 }
 
+export interface StyleReverseSettings {
+  type: "style_extract" | "style_generate" | "style_transfer";
+  styleImageKey: string;         // S3 filename for style reference (relative to S3_INPUT_DIR)
+  contentImageKey?: string;      // S3 filename for content image (Branch 3 only)
+  prompt?: string;               // Subject + style prompt (Branch 2 only)
+  width?: number;
+  height?: number;
+  turboMode?: boolean;
+  steps?: number;
+  guidance?: number;
+}
+
+export function parseStyleGraph(settings: StyleReverseSettings): Record<string, any> {
+  const { type, styleImageKey, contentImageKey, prompt } = settings;
+
+  let templateFileName = "";
+  if (type === "style_extract") {
+    templateFileName = "api_style_extract.json";
+  } else if (type === "style_generate") {
+    templateFileName = "api_style_generate.json";
+  } else if (type === "style_transfer") {
+    templateFileName = "api_style_transfer.json";
+  } else {
+    throw new Error(`Unsupported style workflow type: ${type}`);
+  }
+
+  const templatePath = path.join(
+    process.cwd(),
+    "lib",
+    "comfy-templates",
+    templateFileName
+  );
+
+  if (!fs.existsSync(templatePath)) {
+    throw new Error(`Workflow template not found: ${templateFileName}`);
+  }
+
+  const graph = JSON.parse(fs.readFileSync(templatePath, "utf8"));
+  const getRandomSeed = () => Math.floor(Math.random() * 9007199254740991);
+
+  if (type === "style_extract") {
+    // Branch 1: Style -> Text (OllamaVision)
+    // Set the style reference image (LoadImageS3 node "1")
+    if (graph["1"] && graph["1"].inputs) {
+      graph["1"].inputs.image = styleImageKey;
+    }
+  } else if (type === "style_generate") {
+    // Branch 2: Style text + subject -> New Image (Flux.2)
+    // Set the prompt (CLIPTextEncode node "26")
+    if (graph["26"] && graph["26"].inputs && prompt) {
+      graph["26"].inputs.text = prompt;
+    }
+
+    // Set random seed
+    if (graph["29"] && graph["29"].inputs) {
+      graph["29"].inputs.noise_seed = getRandomSeed();
+    }
+
+    // Set dimensions
+    const w = settings.width || 1024;
+    const h = settings.height || 1024;
+    if (graph["34"] && graph["34"].inputs) {
+      graph["34"].inputs.width = w;
+      graph["34"].inputs.height = h;
+    }
+    if (graph["35"] && graph["35"].inputs) {
+      graph["35"].inputs.width = w;
+      graph["35"].inputs.height = h;
+    }
+
+    // Turbo mode toggle
+    if (settings.turboMode !== undefined && graph["24"] && graph["24"].inputs) {
+      graph["24"].inputs.value = !!settings.turboMode;
+    }
+
+    // Steps override
+    if (settings.steps) {
+      if (graph["32"] && graph["32"].inputs) {
+        graph["32"].inputs.value = settings.steps; // normal steps
+      }
+      if (graph["31"] && graph["31"].inputs) {
+        graph["31"].inputs.value = Math.max(4, Math.floor(settings.steps / 2)); // turbo steps
+      }
+    }
+
+    // Guidance override
+    if (settings.guidance && graph["27"] && graph["27"].inputs) {
+      graph["27"].inputs.guidance = settings.guidance;
+    }
+
+    // Output prefix includes a unique ID for easy retrieval
+    if (graph["38"] && graph["38"].inputs) {
+      graph["38"].inputs.filename_prefix = `StyleGen_${Date.now()}`;
+    }
+  } else if (type === "style_transfer") {
+    // Branch 3: Style + Content -> Transferred Image (Qwen-Image-Edit)
+    // Set style reference image (LoadImageS3 node "1")
+    if (graph["1"] && graph["1"].inputs) {
+      graph["1"].inputs.image = styleImageKey;
+    }
+
+    // Set content image (LoadImageS3 node "2")
+    if (graph["2"] && graph["2"].inputs && contentImageKey) {
+      graph["2"].inputs.image = contentImageKey;
+    }
+
+    // Set random seed
+    if (graph["60"] && graph["60"].inputs) {
+      graph["60"].inputs.seed = getRandomSeed();
+    }
+
+    // Turbo mode toggle (lightning LoRA)
+    if (settings.turboMode !== undefined && graph["46"] && graph["46"].inputs) {
+      graph["46"].inputs.value = !!settings.turboMode;
+    }
+
+    // Steps override
+    if (settings.steps) {
+      if (graph["58"] && graph["58"].inputs) {
+        graph["58"].inputs.value = settings.steps; // normal steps
+      }
+      if (graph["57"] && graph["57"].inputs) {
+        graph["57"].inputs.value = Math.max(4, Math.floor(settings.steps / 10)); // lightning steps
+      }
+    }
+
+    // Output prefix includes a unique ID
+    if (graph["62"] && graph["62"].inputs) {
+      graph["62"].inputs.filename_prefix = `StyleTransfer_${Date.now()}`;
+    }
+  }
+
+  return graph;
+}
+
 export function parseGraph(
   prompt: string,
   settings: GenSettings,

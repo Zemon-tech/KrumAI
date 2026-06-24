@@ -1,0 +1,45 @@
+{
+  "1": {
+    "inputs": {
+      "image": "style_reference.png"
+    },
+    "class_type": "LoadImageS3",
+    "_meta": {
+      "title": "STYLE Reference Image (S3)"
+    }
+  },
+  "10": {
+    "inputs": {
+      "model": "joycaption-alpha-two",
+      "quantization": "Full Precision (bf16)",
+      "prompt_style": "Descriptive",
+      "caption_length": "any",
+      "max_new_tokens": 512,
+      "temperature": 0.6,
+      "top_p": 0.9,
+      "top_k": 0,
+      "custom_prompt": "You are a Visual Style DNA Analyst. Extract ONLY the transferable style system of this image — NOT the subject or content. Focus on what makes the visual design work independently of what is depicted.\n\nAnalyze and output as a structured comma-separated list covering these layers:\n\n1. VISUAL IDENTITY: Style category, design language, aesthetic genre (e.g., luxury editorial, neo-minimalism, cinematic surrealism, organic luxury)\n2. COLOR DNA: Dominant palette, saturation level, temperature, contrast, harmony type, emotional purpose\n3. LIGHTING DNA: Direction, softness, intensity, shadow behavior, highlights, volumetric quality, atmospheric depth\n4. TEXTURE DNA: Grain type, surface feel, material perception, finish (film grain, matte, glossy, painterly, ultra-clean)\n5. COMPOSITION DNA: Framing strategy, negative space usage, focal hierarchy, visual weight distribution, depth layers\n6. MOOD DNA: Atmosphere, emotional tone, energy level, tension, warmth, psychological impact\n7. CINEMATIC DNA: Lens feel, camera distance, depth of field, color grading style, filmic qualities\n8. DESIGN PSYCHOLOGY: Why it feels premium/modern/luxurious, attention mechanisms, brand signals\n\nRULES:\n- Never mention specific subjects, people, objects, or locations\n- Focus on transferable patterns that work across any subject\n- Think: if the subject disappeared, what visual principles remain?\n- Output as dense comma-separated style keywords and short phrases\n- Group by layer using pipe separators: IDENTITY | COLOR | LIGHTING | TEXTURE | COMPOSITION | MOOD | CINEMATIC | PSYCHOLOGY",
+      "memory_management": "Keep in Memory",
+      "image": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "JC_adv",
+    "_meta": {
+      "title": "Style Extractor (JoyCaption Advanced)"
+    }
+  },
+  "11": {
+    "inputs": {
+      "text": [
+        "10",
+        1
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Extracted Style Text"
+    }
+  }
+}

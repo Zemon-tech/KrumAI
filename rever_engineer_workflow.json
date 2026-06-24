@@ -1,0 +1,667 @@
+{
+  "1": {
+    "inputs": {
+      "image": "style_reference.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "STYLE Reference Image"
+    }
+  },
+  "2": {
+    "inputs": {
+      "image": "content_reference.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "CONTENT / Subject Image (for style-transfer branch)"
+    }
+  },
+  "10": {
+    "inputs": {
+      "query": "Describe ONLY the artistic / visual STYLE of this image - lighting, color grading, composition, lens choice, depth of field, rendering medium (photo/3D/painterly/etc), grain/texture, and overall mood. Do NOT describe the subject, people, or objects in the image. Output as a single comma-separated list of style keywords/phrases suitable for use as a text-to-image prompt.",
+      "debug": "disable",
+      "url": "qwen2.5vl:7b",
+      "model": 0,
+      "keep_alive": 5,
+      "format": "",
+      "seed": "http://127.0.0.1:11434",
+      "images": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "OllamaVision",
+    "_meta": {
+      "title": "Style Extractor (Ollama Vision)"
+    }
+  },
+  "11": {
+    "inputs": {
+      "text": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "Extracted Style (copy this)"
+    }
+  },
+  "20": {
+    "inputs": {
+      "unet_name": "flux2_dev_fp8mixed.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "21": {
+    "inputs": {
+      "clip_name": "mistral_3_small_flux2_bf16.safetensors",
+      "type": "flux2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "22": {
+    "inputs": {
+      "vae_name": "flux2-vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "23": {
+    "inputs": {
+      "lora_name": "Flux_2-Turbo-LoRA_comfyui.safetensors",
+      "strength_model": 1,
+      "model": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Turbo LoRA"
+    }
+  },
+  "24": {
+    "inputs": {
+      "value": false
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Enable Turbo LoRA?"
+    }
+  },
+  "25": {
+    "inputs": {
+      "switch": [
+        "24",
+        0
+      ],
+      "on_false": [
+        "20",
+        0
+      ],
+      "on_true": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (Model)"
+    }
+  },
+  "26": {
+    "inputs": {
+      "text": "<-- paste the 'Extracted Style' text here, then add your own subject, e.g.: a red fox sitting in snow, [extracted style keywords go here]",
+      "clip": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (PASTE extracted style + your subject here)"
+    }
+  },
+  "27": {
+    "inputs": {
+      "guidance": 4,
+      "conditioning": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "FluxGuidance",
+    "_meta": {
+      "title": "FluxGuidance"
+    }
+  },
+  "28": {
+    "inputs": {
+      "model": [
+        "25",
+        0
+      ],
+      "conditioning": [
+        "27",
+        0
+      ]
+    },
+    "class_type": "BasicGuider",
+    "_meta": {
+      "title": "Basic Guider"
+    }
+  },
+  "29": {
+    "inputs": {
+      "noise_seed": 978636419372261
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "30": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "31": {
+    "inputs": {
+      "value": 8
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Steps (turbo)"
+    }
+  },
+  "32": {
+    "inputs": {
+      "value": 20
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Steps (normal)"
+    }
+  },
+  "33": {
+    "inputs": {
+      "switch": [
+        "24",
+        0
+      ],
+      "on_false": [
+        "32",
+        0
+      ],
+      "on_true": [
+        "31",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (Steps)"
+    }
+  },
+  "34": {
+    "inputs": {
+      "width": 1024,
+      "height": 1024,
+      "batch_size": 1
+    },
+    "class_type": "EmptyFlux2LatentImage",
+    "_meta": {
+      "title": "Empty Flux 2 Latent"
+    }
+  },
+  "35": {
+    "inputs": {
+      "steps": [
+        "33",
+        0
+      ],
+      "width": 1024,
+      "height": 1024
+    },
+    "class_type": "Flux2Scheduler",
+    "_meta": {
+      "title": "Flux2Scheduler"
+    }
+  },
+  "36": {
+    "inputs": {
+      "noise": [
+        "29",
+        0
+      ],
+      "guider": [
+        "28",
+        0
+      ],
+      "sampler": [
+        "30",
+        0
+      ],
+      "sigmas": [
+        "35",
+        0
+      ],
+      "latent_image": [
+        "34",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "37": {
+    "inputs": {
+      "samples": [
+        "36",
+        0
+      ],
+      "vae": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "38": {
+    "inputs": {
+      "filename_prefix": "StyleGen_Flux2",
+      "images": [
+        "37",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save - Style-Generated Image (Flux.2)"
+    }
+  },
+  "40": {
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNET (Qwen-Image-Edit)"
+    }
+  },
+  "41": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "CLIP (Qwen)"
+    }
+  },
+  "42": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "VAE (Qwen)"
+    }
+  },
+  "43": {
+    "inputs": {
+      "shift": 3.1,
+      "model": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "44": {
+    "inputs": {
+      "strength": 1,
+      "pre_cfg": false,
+      "model": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "CFGNorm",
+    "_meta": {
+      "title": "CFGNorm"
+    }
+  },
+  "45": {
+    "inputs": {
+      "lora_name": "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "44",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "4-Step Lightning LoRA"
+    }
+  },
+  "46": {
+    "inputs": {
+      "value": true
+    },
+    "class_type": "PrimitiveBoolean",
+    "_meta": {
+      "title": "Enable 4-Step Lightning LoRA?"
+    }
+  },
+  "47": {
+    "inputs": {
+      "switch": [
+        "46",
+        0
+      ],
+      "on_false": [
+        "44",
+        0
+      ],
+      "on_true": [
+        "45",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (Model)"
+    }
+  },
+  "48": {
+    "inputs": {
+      "image": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "FluxKontextImageScale",
+    "_meta": {
+      "title": "Scale Content Image"
+    }
+  },
+  "49": {
+    "inputs": {
+      "prompt": "",
+      "clip": [
+        "41",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ],
+      "image1": [
+        "48",
+        0
+      ],
+      "image2": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus (Negative - leave blank)"
+    }
+  },
+  "50": {
+    "inputs": {
+      "prompt": "image1 is the content/subject. image2 is the style reference. Repaint image1 using the visual style of image2 (lighting, color grading, rendering medium, mood) while keeping image1's composition, subject identity, and pose unchanged.",
+      "clip": [
+        "41",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ],
+      "image1": [
+        "48",
+        0
+      ],
+      "image2": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus (Positive - style transfer instruction)"
+    }
+  },
+  "51": {
+    "inputs": {
+      "reference_latents_method": "index_timestep_zero",
+      "conditioning": [
+        "49",
+        0
+      ]
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Multi-Ref Method (Negative)"
+    }
+  },
+  "52": {
+    "inputs": {
+      "reference_latents_method": "index_timestep_zero",
+      "conditioning": [
+        "50",
+        0
+      ]
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Multi-Ref Method (Positive)"
+    }
+  },
+  "53": {
+    "inputs": {
+      "pixels": [
+        "48",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "54": {
+    "inputs": {
+      "value": 1
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "CFG (lightning)"
+    }
+  },
+  "55": {
+    "inputs": {
+      "value": 4
+    },
+    "class_type": "PrimitiveFloat",
+    "_meta": {
+      "title": "CFG (normal)"
+    }
+  },
+  "56": {
+    "inputs": {
+      "switch": [
+        "46",
+        0
+      ],
+      "on_false": [
+        "55",
+        0
+      ],
+      "on_true": [
+        "54",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (CFG)"
+    }
+  },
+  "57": {
+    "inputs": {
+      "value": 4
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Steps (lightning)"
+    }
+  },
+  "58": {
+    "inputs": {
+      "value": 40
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Steps (normal)"
+    }
+  },
+  "59": {
+    "inputs": {
+      "switch": [
+        "46",
+        0
+      ],
+      "on_false": [
+        "58",
+        0
+      ],
+      "on_true": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "ComfySwitchNode",
+    "_meta": {
+      "title": "Switch (Steps)"
+    }
+  },
+  "60": {
+    "inputs": {
+      "seed": 318693523635328,
+      "steps": [
+        "59",
+        0
+      ],
+      "cfg": [
+        "56",
+        0
+      ],
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "47",
+        0
+      ],
+      "positive": [
+        "52",
+        0
+      ],
+      "negative": [
+        "51",
+        0
+      ],
+      "latent_image": [
+        "53",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "61": {
+    "inputs": {
+      "samples": [
+        "60",
+        0
+      ],
+      "vae": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "62": {
+    "inputs": {
+      "filename_prefix": "StyleTransfer_Qwen",
+      "images": [
+        "61",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save - Style-Transferred Image (Qwen-Image-Edit)"
+    }
+  },
+  "63": {
+    "inputs": {
+      "image": "/"
+    },
+    "class_type": "LoadImageS3",
+    "_meta": {
+      "title": "Load Image from S3"
+    }
+  },
+  "65": {
+    "inputs": {
+      "filename_prefix": "Image"
+    },
+    "class_type": "SaveImageS3",
+    "_meta": {
+      "title": "Save Image to S3"
+    }
+  }
+}

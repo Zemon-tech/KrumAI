@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
+import { getPublicOutputUrl } from "@/lib/s3Client";
 import fs from "fs";
 import path from "path";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { filename, subfolder, type } = body;
+    const { filename, subfolder, type, source } = body;
 
     if (!filename) {
       return NextResponse.json(
@@ -13,6 +14,22 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // If source is "s3", the file is already in S3 — just return the public URL
+    if (source === "s3") {
+      // Construct the public S3 URL for the output
+      // SaveImageS3 stores files in the S3_OUTPUT_DIR prefix
+      const s3Key = `outputs/${filename}`;
+      const publicUrl = getPublicOutputUrl(s3Key);
+      console.log(`Asset already in S3, returning public URL: ${publicUrl}`);
+      return NextResponse.json({
+        url: publicUrl,
+        source: "s3",
+        success: true,
+      });
+    }
+
+    // Default: fetch from ComfyUI's local view endpoint and save locally (legacy behavior)
 
     const comfyHttpUrl = process.env.COMFYUI_HTTP_URL || "http://127.0.0.1:8188";
     

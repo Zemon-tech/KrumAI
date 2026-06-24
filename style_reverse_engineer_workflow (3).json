@@ -1,0 +1,2422 @@
+{
+  "id": "f3a9d3b0-style-reverse-engineer-0001",
+  "revision": 0,
+  "last_node_id": 62,
+  "last_link_id": 56,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [
+        -1700,
+        -200
+      ],
+      "size": [
+        320,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            1,
+            33,
+            37
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "style_reference.png",
+        "image"
+      ],
+      "title": "STYLE Reference Image"
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        -1700,
+        180
+      ],
+      "size": [
+        320,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            29
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "content_reference.png",
+        "image"
+      ],
+      "title": "CONTENT / Subject Image (for style-transfer branch)"
+    },
+    {
+      "id": 3,
+      "type": "MarkdownNote",
+      "pos": [
+        -2080,
+        -200
+      ],
+      "size": [
+        350,
+        700
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "MarkdownNote"
+      },
+      "widgets_values": [
+        "# Style Reverse-Engineering Template\n\n## 3 things this graph does\n1. **STYLE -> TEXT** (top branch): feeds the Style Reference image into a\n   vision-LLM (Ollama) which is prompted to describe ONLY the visual style\n   (lighting, palette, lens, rendering, mood) and ignore subject matter.\n   Result is shown in the 'Extracted Style' text box - copy it.\n2. **STYLE -> NEW IMAGE** (middle branch, Flux.2): paste the extracted style\n   text + your own subject into the green 'Positive Prompt' box to generate\n   brand-new images in that style.\n3. **STYLE TRANSFER ONTO AN IMAGE** (bottom branch, Qwen-Image-Edit): feeds\n   BOTH the style reference and a content image into Qwen-Image-Edit's\n   multi-reference inputs so it directly repaints the content image in the\n   style of the reference - no text description needed.\n\n## Required custom nodes (install via ComfyUI Manager -> 'Install Missing\nCustom Nodes' after importing this file)\n- **ComfyUI-Ollama** (stavsap) - for the OllamaVision captioner.\n  Requires a local Ollama server running a vision model, e.g.\n  `ollama pull qwen2.5vl:7b` or `llava:13b`.\n- **ComfyUI (pysssss)** - provides the 'Show Text' node used to display the\n  extracted style description.\n\n## Required model files\nSame as your existing workflows:\n- Flux.2: flux2_dev_fp8mixed.safetensors, mistral_3_small_flux2_bf16.safetensors,\n  flux2-vae.safetensors, Flux_2-Turbo-LoRA_comfyui.safetensors\n- Qwen-Image-Edit: qwen_image_edit_2511_bf16.safetensors,\n  qwen_2.5_vl_7b_fp8_scaled.safetensors, qwen_image_vae.safetensors,\n  Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors\n\nComfyUI will prompt you to download anything missing the first time you\nload this and click 'Queue'.\n"
+      ],
+      "title": "README - Read Me First"
+    },
+    {
+      "id": 10,
+      "type": "JC_adv",
+      "pos": [
+        -1300,
+        -200
+      ],
+      "size": [
+        420,
+        480
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "JC_adv"
+      },
+      "widgets_values": [
+        "SELECT_MODEL_FROM_DROPDOWN",
+        "Balanced (8-bit)",
+        "Descriptive",
+        "any",
+        350,
+        0.6,
+        0.9,
+        0,
+        "Describe ONLY the artistic / visual STYLE of this image - lighting, color grading, composition, lens choice, depth of field, rendering medium (photo/3D/painterly/etc), grain/texture, and overall mood. Do NOT describe the subject, people, or objects in the image. Output as a single comma-separated list of style keywords/phrases suitable for use as a text-to-image prompt.",
+        "Keep in Memory"
+      ],
+      "title": "Style Extractor (JoyCaption Advanced)"
+    },
+    {
+      "id": 11,
+      "type": "ShowText|pysssss",
+      "pos": [
+        -820,
+        -200
+      ],
+      "size": [
+        420,
+        260
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "title": "Extracted Style (copy this)"
+    },
+    {
+      "id": 20,
+      "type": "UNETLoader",
+      "pos": [
+        -1300,
+        250
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3,
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "flux2_dev_fp8mixed.safetensors",
+        "default"
+      ]
+    },
+    {
+      "id": 21,
+      "type": "CLIPLoader",
+      "pos": [
+        -1300,
+        400
+      ],
+      "size": [
+        320,
+        150
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "mistral_3_small_flux2_bf16.safetensors",
+        "flux2",
+        "default"
+      ]
+    },
+    {
+      "id": 22,
+      "type": "VAELoader",
+      "pos": [
+        -1300,
+        590
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            21
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "flux2-vae.safetensors"
+      ]
+    },
+    {
+      "id": 23,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -900,
+        250
+      ],
+      "size": [
+        300,
+        140
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        },
+        {
+          "name": "lora_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "lora_name"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "Flux_2-Turbo-LoRA_comfyui.safetensors",
+        1
+      ],
+      "title": "Turbo LoRA"
+    },
+    {
+      "id": 24,
+      "type": "PrimitiveBoolean",
+      "pos": [
+        -900,
+        430
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "BOOLEAN",
+          "type": "BOOLEAN",
+          "links": [
+            6,
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveBoolean"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "Enable Turbo LoRA?"
+    },
+    {
+      "id": 25,
+      "type": "ComfySwitchNode",
+      "pos": [
+        -560,
+        250
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "MODEL",
+          "link": 4
+        },
+        {
+          "name": "on_true",
+          "type": "MODEL",
+          "link": 5
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 6,
+          "widget": {
+            "name": "switch"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "Switch (Model)"
+    },
+    {
+      "id": 26,
+      "type": "CLIPTextEncode",
+      "pos": [
+        -900,
+        -550
+      ],
+      "size": [
+        460,
+        460
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 7
+        },
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "<-- paste the 'Extracted Style' text here, then add your own subject, e.g.: a red fox sitting in snow, [extracted style keywords go here]"
+      ],
+      "title": "CLIP Text Encode (PASTE extracted style + your subject here)",
+      "color": "#232",
+      "bgcolor": "#353"
+    },
+    {
+      "id": 27,
+      "type": "FluxGuidance",
+      "pos": [
+        -400,
+        -550
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 8
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxGuidance"
+      },
+      "widgets_values": [
+        4
+      ],
+      "color": "#233",
+      "bgcolor": "#355"
+    },
+    {
+      "id": 28,
+      "type": "BasicGuider",
+      "pos": [
+        -50,
+        -400
+      ],
+      "size": [
+        230,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 9
+        },
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "GUIDER",
+          "type": "GUIDER",
+          "links": [
+            16
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BasicGuider"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 29,
+      "type": "RandomNoise",
+      "pos": [
+        -50,
+        -550
+      ],
+      "size": [
+        230,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise_seed",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "noise_seed"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "NOISE",
+          "type": "NOISE",
+          "links": [
+            15
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "RandomNoise"
+      },
+      "widgets_values": [
+        978636419372261,
+        "randomize"
+      ]
+    },
+    {
+      "id": 30,
+      "type": "KSamplerSelect",
+      "pos": [
+        -50,
+        -250
+      ],
+      "size": [
+        230,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SAMPLER",
+          "type": "SAMPLER",
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSamplerSelect"
+      },
+      "widgets_values": [
+        "euler"
+      ]
+    },
+    {
+      "id": 31,
+      "type": "PrimitiveInt",
+      "pos": [
+        -560,
+        600
+      ],
+      "size": [
+        280,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveInt"
+      },
+      "widgets_values": [
+        8,
+        "fixed"
+      ],
+      "title": "Steps (turbo)"
+    },
+    {
+      "id": 32,
+      "type": "PrimitiveInt",
+      "pos": [
+        -560,
+        470
+      ],
+      "size": [
+        280,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveInt"
+      },
+      "widgets_values": [
+        20,
+        "fixed"
+      ],
+      "title": "Steps (normal)"
+    },
+    {
+      "id": 33,
+      "type": "ComfySwitchNode",
+      "pos": [
+        -220,
+        530
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "INT",
+          "link": 11
+        },
+        {
+          "name": "on_true",
+          "type": "INT",
+          "link": 12
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 13,
+          "widget": {
+            "name": "switch"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            14
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "Switch (Steps)"
+    },
+    {
+      "id": 34,
+      "type": "EmptyFlux2LatentImage",
+      "pos": [
+        -900,
+        750
+      ],
+      "size": [
+        270,
+        170
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "width",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "width"
+          }
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "height"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            19
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyFlux2LatentImage"
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        1
+      ]
+    },
+    {
+      "id": 35,
+      "type": "Flux2Scheduler",
+      "pos": [
+        250,
+        -250
+      ],
+      "size": [
+        230,
+        170
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "steps",
+          "type": "INT",
+          "link": 14,
+          "widget": {
+            "name": "steps"
+          }
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "width"
+          }
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "link": null,
+          "widget": {
+            "name": "height"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SIGMAS",
+          "type": "SIGMAS",
+          "links": [
+            18
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Flux2Scheduler"
+      },
+      "widgets_values": [
+        20,
+        1024,
+        1024
+      ]
+    },
+    {
+      "id": 36,
+      "type": "SamplerCustomAdvanced",
+      "pos": [
+        560,
+        -550
+      ],
+      "size": [
+        280,
+        330
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "noise",
+          "type": "NOISE",
+          "link": 15
+        },
+        {
+          "name": "guider",
+          "type": "GUIDER",
+          "link": 16
+        },
+        {
+          "name": "sampler",
+          "type": "SAMPLER",
+          "link": 17
+        },
+        {
+          "name": "sigmas",
+          "type": "SIGMAS",
+          "link": 18
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 19
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            20
+          ]
+        },
+        {
+          "name": "denoised_output",
+          "type": "LATENT",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SamplerCustomAdvanced"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 37,
+      "type": "VAEDecode",
+      "pos": [
+        920,
+        -550
+      ],
+      "size": [
+        230,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 20
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 21
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            22
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 38,
+      "type": "SaveImage",
+      "pos": [
+        1220,
+        -550
+      ],
+      "size": [
+        460,
+        480
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 22
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "StyleGen_Flux2"
+      ],
+      "title": "Save - Style-Generated Image (Flux.2)"
+    },
+    {
+      "id": 40,
+      "type": "UNETLoader",
+      "pos": [
+        -1300,
+        1050
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "UNETLoader"
+      },
+      "widgets_values": [
+        "qwen_image_edit_2511_bf16.safetensors",
+        "default"
+      ],
+      "title": "UNET (Qwen-Image-Edit)"
+    },
+    {
+      "id": 41,
+      "type": "CLIPLoader",
+      "pos": [
+        -1300,
+        1200
+      ],
+      "size": [
+        320,
+        150
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            30,
+            34
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPLoader"
+      },
+      "widgets_values": [
+        "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        "qwen_image",
+        "default"
+      ],
+      "title": "CLIP (Qwen)"
+    },
+    {
+      "id": 42,
+      "type": "VAELoader",
+      "pos": [
+        -1300,
+        1390
+      ],
+      "size": [
+        320,
+        110
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            31,
+            35,
+            41,
+            55
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAELoader"
+      },
+      "widgets_values": [
+        "qwen_image_vae.safetensors"
+      ],
+      "title": "VAE (Qwen)"
+    },
+    {
+      "id": 43,
+      "type": "ModelSamplingAuraFlow",
+      "pos": [
+        -900,
+        1050
+      ],
+      "size": [
+        280,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 23
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            24
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ModelSamplingAuraFlow"
+      },
+      "widgets_values": [
+        3.1
+      ]
+    },
+    {
+      "id": 44,
+      "type": "CFGNorm",
+      "pos": [
+        -560,
+        1050
+      ],
+      "size": [
+        260,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 24
+        }
+      ],
+      "outputs": [
+        {
+          "name": "patched_model",
+          "type": "MODEL",
+          "links": [
+            25,
+            26
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CFGNorm"
+      },
+      "widgets_values": [
+        1,
+        false
+      ]
+    },
+    {
+      "id": 45,
+      "type": "LoraLoaderModelOnly",
+      "pos": [
+        -560,
+        1200
+      ],
+      "size": [
+        300,
+        140
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 25
+        },
+        {
+          "name": "lora_name",
+          "type": "COMBO",
+          "link": null,
+          "widget": {
+            "name": "lora_name"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            27
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoraLoaderModelOnly"
+      },
+      "widgets_values": [
+        "Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+        1
+      ],
+      "title": "4-Step Lightning LoRA"
+    },
+    {
+      "id": 46,
+      "type": "PrimitiveBoolean",
+      "pos": [
+        -560,
+        1400
+      ],
+      "size": [
+        300,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "BOOLEAN",
+          "type": "BOOLEAN",
+          "links": [
+            28,
+            44,
+            47
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveBoolean"
+      },
+      "widgets_values": [
+        true
+      ],
+      "title": "Enable 4-Step Lightning LoRA?"
+    },
+    {
+      "id": 47,
+      "type": "ComfySwitchNode",
+      "pos": [
+        -220,
+        1100
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "MODEL",
+          "link": 26
+        },
+        {
+          "name": "on_true",
+          "type": "MODEL",
+          "link": 27
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 28,
+          "widget": {
+            "name": "switch"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            48
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "Switch (Model)"
+    },
+    {
+      "id": 48,
+      "type": "FluxKontextImageScale",
+      "pos": [
+        -1300,
+        1580
+      ],
+      "size": [
+        280,
+        80
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 29
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            32,
+            36,
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextImageScale"
+      },
+      "widgets_values": [],
+      "title": "Scale Content Image"
+    },
+    {
+      "id": 49,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -900,
+        1700
+      ],
+      "size": [
+        420,
+        220
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 30
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 31
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 32
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 33
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            38
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "title": "TextEncodeQwenImageEditPlus (Negative - leave blank)"
+    },
+    {
+      "id": 50,
+      "type": "TextEncodeQwenImageEditPlus",
+      "pos": [
+        -900,
+        1950
+      ],
+      "size": [
+        420,
+        220
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 34
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 35
+        },
+        {
+          "name": "image1",
+          "type": "IMAGE",
+          "link": 36
+        },
+        {
+          "name": "image2",
+          "type": "IMAGE",
+          "link": 37
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            39
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "TextEncodeQwenImageEditPlus"
+      },
+      "widgets_values": [
+        "image1 is the content/subject. image2 is the style reference. Repaint image1 using the visual style of image2 (lighting, color grading, rendering medium, mood) while keeping image1's composition, subject identity, and pose unchanged."
+      ],
+      "title": "TextEncodeQwenImageEditPlus (Positive - style transfer instruction)"
+    },
+    {
+      "id": 51,
+      "type": "FluxKontextMultiReferenceLatentMethod",
+      "pos": [
+        -420,
+        1700
+      ],
+      "size": [
+        300,
+        80
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 38
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            50
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextMultiReferenceLatentMethod"
+      },
+      "widgets_values": [
+        "index_timestep_zero"
+      ],
+      "title": "Multi-Ref Method (Negative)"
+    },
+    {
+      "id": 52,
+      "type": "FluxKontextMultiReferenceLatentMethod",
+      "pos": [
+        -420,
+        1950
+      ],
+      "size": [
+        300,
+        80
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "conditioning",
+          "type": "CONDITIONING",
+          "link": 39
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            49
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "FluxKontextMultiReferenceLatentMethod"
+      },
+      "widgets_values": [
+        "index_timestep_zero"
+      ],
+      "title": "Multi-Ref Method (Positive)"
+    },
+    {
+      "id": 53,
+      "type": "VAEEncode",
+      "pos": [
+        -900,
+        2220
+      ],
+      "size": [
+        260,
+        80
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "pixels",
+          "type": "IMAGE",
+          "link": 40
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 41
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            51
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEEncode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 54,
+      "type": "PrimitiveFloat",
+      "pos": [
+        -220,
+        1300
+      ],
+      "size": [
+        260,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": [
+            43
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveFloat"
+      },
+      "widgets_values": [
+        1
+      ],
+      "title": "CFG (lightning)"
+    },
+    {
+      "id": 55,
+      "type": "PrimitiveFloat",
+      "pos": [
+        -220,
+        1430
+      ],
+      "size": [
+        260,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": [
+            42
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveFloat"
+      },
+      "widgets_values": [
+        4
+      ],
+      "title": "CFG (normal)"
+    },
+    {
+      "id": 56,
+      "type": "ComfySwitchNode",
+      "pos": [
+        120,
+        1300
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "FLOAT",
+          "link": 42
+        },
+        {
+          "name": "on_true",
+          "type": "FLOAT",
+          "link": 43
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 44,
+          "widget": {
+            "name": "switch"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "FLOAT",
+          "type": "FLOAT",
+          "links": [
+            53
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "Switch (CFG)"
+    },
+    {
+      "id": 57,
+      "type": "PrimitiveInt",
+      "pos": [
+        120,
+        1500
+      ],
+      "size": [
+        260,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            46
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveInt"
+      },
+      "widgets_values": [
+        4,
+        "fixed"
+      ],
+      "title": "Steps (lightning)"
+    },
+    {
+      "id": 58,
+      "type": "PrimitiveInt",
+      "pos": [
+        120,
+        1630
+      ],
+      "size": [
+        260,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            45
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrimitiveInt"
+      },
+      "widgets_values": [
+        40,
+        "fixed"
+      ],
+      "title": "Steps (normal)"
+    },
+    {
+      "id": 59,
+      "type": "ComfySwitchNode",
+      "pos": [
+        420,
+        1530
+      ],
+      "size": [
+        270,
+        130
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "on_false",
+          "type": "INT",
+          "link": 45
+        },
+        {
+          "name": "on_true",
+          "type": "INT",
+          "link": 46
+        },
+        {
+          "name": "switch",
+          "type": "BOOLEAN",
+          "link": 47,
+          "widget": {
+            "name": "switch"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            52
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ComfySwitchNode"
+      },
+      "widgets_values": [
+        false
+      ],
+      "title": "Switch (Steps)"
+    },
+    {
+      "id": 60,
+      "type": "KSampler",
+      "pos": [
+        780,
+        1700
+      ],
+      "size": [
+        280,
+        320
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 48
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 49
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 50
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 51
+        },
+        {
+          "name": "steps",
+          "type": "INT",
+          "link": 52,
+          "widget": {
+            "name": "steps"
+          }
+        },
+        {
+          "name": "cfg",
+          "type": "FLOAT",
+          "link": 53,
+          "widget": {
+            "name": "cfg"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            54
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        318693523635328,
+        "randomize",
+        40,
+        3,
+        "euler",
+        "simple",
+        1
+      ]
+    },
+    {
+      "id": 61,
+      "type": "VAEDecode",
+      "pos": [
+        1120,
+        1750
+      ],
+      "size": [
+        230,
+        100
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 54
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 55
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            56
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 62,
+      "type": "SaveImage",
+      "pos": [
+        1400,
+        1750
+      ],
+      "size": [
+        460,
+        480
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 56
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "Node name for S&R": "SaveImage"
+      },
+      "widgets_values": [
+        "StyleTransfer_Qwen"
+      ],
+      "title": "Save - Style-Transferred Image (Qwen-Image-Edit)"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      10,
+      0,
+      "IMAGE"
+    ],
+    [
+      2,
+      10,
+      0,
+      11,
+      0,
+      "STRING"
+    ],
+    [
+      3,
+      20,
+      0,
+      23,
+      0,
+      "MODEL"
+    ],
+    [
+      4,
+      20,
+      0,
+      25,
+      0,
+      "MODEL"
+    ],
+    [
+      5,
+      23,
+      0,
+      25,
+      1,
+      "MODEL"
+    ],
+    [
+      6,
+      24,
+      0,
+      25,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      7,
+      21,
+      0,
+      26,
+      0,
+      "CLIP"
+    ],
+    [
+      8,
+      26,
+      0,
+      27,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      9,
+      25,
+      0,
+      28,
+      0,
+      "MODEL"
+    ],
+    [
+      10,
+      27,
+      0,
+      28,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      11,
+      32,
+      0,
+      33,
+      0,
+      "INT"
+    ],
+    [
+      12,
+      31,
+      0,
+      33,
+      1,
+      "INT"
+    ],
+    [
+      13,
+      24,
+      0,
+      33,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      14,
+      33,
+      0,
+      35,
+      0,
+      "INT"
+    ],
+    [
+      15,
+      29,
+      0,
+      36,
+      0,
+      "NOISE"
+    ],
+    [
+      16,
+      28,
+      0,
+      36,
+      1,
+      "GUIDER"
+    ],
+    [
+      17,
+      30,
+      0,
+      36,
+      2,
+      "SAMPLER"
+    ],
+    [
+      18,
+      35,
+      0,
+      36,
+      3,
+      "SIGMAS"
+    ],
+    [
+      19,
+      34,
+      0,
+      36,
+      4,
+      "LATENT"
+    ],
+    [
+      20,
+      36,
+      0,
+      37,
+      0,
+      "LATENT"
+    ],
+    [
+      21,
+      22,
+      0,
+      37,
+      1,
+      "VAE"
+    ],
+    [
+      22,
+      37,
+      0,
+      38,
+      0,
+      "IMAGE"
+    ],
+    [
+      23,
+      40,
+      0,
+      43,
+      0,
+      "MODEL"
+    ],
+    [
+      24,
+      43,
+      0,
+      44,
+      0,
+      "MODEL"
+    ],
+    [
+      25,
+      44,
+      0,
+      45,
+      0,
+      "MODEL"
+    ],
+    [
+      26,
+      44,
+      0,
+      47,
+      0,
+      "MODEL"
+    ],
+    [
+      27,
+      45,
+      0,
+      47,
+      1,
+      "MODEL"
+    ],
+    [
+      28,
+      46,
+      0,
+      47,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      29,
+      2,
+      0,
+      48,
+      0,
+      "IMAGE"
+    ],
+    [
+      30,
+      41,
+      0,
+      49,
+      0,
+      "CLIP"
+    ],
+    [
+      31,
+      42,
+      0,
+      49,
+      1,
+      "VAE"
+    ],
+    [
+      32,
+      48,
+      0,
+      49,
+      2,
+      "IMAGE"
+    ],
+    [
+      33,
+      1,
+      0,
+      49,
+      3,
+      "IMAGE"
+    ],
+    [
+      34,
+      41,
+      0,
+      50,
+      0,
+      "CLIP"
+    ],
+    [
+      35,
+      42,
+      0,
+      50,
+      1,
+      "VAE"
+    ],
+    [
+      36,
+      48,
+      0,
+      50,
+      2,
+      "IMAGE"
+    ],
+    [
+      37,
+      1,
+      0,
+      50,
+      3,
+      "IMAGE"
+    ],
+    [
+      38,
+      49,
+      0,
+      51,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      39,
+      50,
+      0,
+      52,
+      0,
+      "CONDITIONING"
+    ],
+    [
+      40,
+      48,
+      0,
+      53,
+      0,
+      "IMAGE"
+    ],
+    [
+      41,
+      42,
+      0,
+      53,
+      1,
+      "VAE"
+    ],
+    [
+      42,
+      55,
+      0,
+      56,
+      0,
+      "FLOAT"
+    ],
+    [
+      43,
+      54,
+      0,
+      56,
+      1,
+      "FLOAT"
+    ],
+    [
+      44,
+      46,
+      0,
+      56,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      45,
+      58,
+      0,
+      59,
+      0,
+      "INT"
+    ],
+    [
+      46,
+      57,
+      0,
+      59,
+      1,
+      "INT"
+    ],
+    [
+      47,
+      46,
+      0,
+      59,
+      2,
+      "BOOLEAN"
+    ],
+    [
+      48,
+      47,
+      0,
+      60,
+      0,
+      "MODEL"
+    ],
+    [
+      49,
+      52,
+      0,
+      60,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      50,
+      51,
+      0,
+      60,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      51,
+      53,
+      0,
+      60,
+      3,
+      "LATENT"
+    ],
+    [
+      52,
+      59,
+      0,
+      60,
+      4,
+      "INT"
+    ],
+    [
+      53,
+      56,
+      0,
+      60,
+      5,
+      "FLOAT"
+    ],
+    [
+      54,
+      60,
+      0,
+      61,
+      0,
+      "LATENT"
+    ],
+    [
+      55,
+      42,
+      0,
+      61,
+      1,
+      "VAE"
+    ],
+    [
+      56,
+      61,
+      0,
+      62,
+      0,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "1) STYLE -> TEXT  (reverse-engineer the style)",
+      "bounding": [
+        -2120,
+        -260,
+        1900,
+        360
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "2) STYLE -> NEW IMAGE  (Flux.2 Dev text2img)",
+      "bounding": [
+        -1340,
+        -620,
+        2940,
+        1320
+      ],
+      "color": "#a8763e",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "3) STYLE TRANSFER ONTO AN IMAGE  (Qwen-Image-Edit multi-reference)",
+      "bounding": [
+        -1340,
+        980,
+        3220,
+        1820
+      ],
+      "color": "#5e3f9e",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "frontendVersion": "1.45.15",
+    "ds": {
+      "scale": 0.45,
+      "offset": [
+        2200,
+        700
+      ]
+    }
+  },
+  "version": 0.4
+}
